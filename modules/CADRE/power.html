@@ -1,0 +1,379 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.power &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.power</h1><div class="highlight"><pre>
+<span class="sd">&#39;&#39;&#39; Power discipline for CADRE &#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Component</span>
+<span class="kn">from</span> <span class="nn">openmdao.lib.datatypes.api</span> <span class="kn">import</span> <span class="n">Array</span>
+
+<span class="kn">import</span> <span class="nn">MBI</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+
+<div class="viewcode-block" id="Power_CellVoltage"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_CellVoltage">[docs]</a><span class="k">class</span> <span class="nc">Power_CellVoltage</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Compute the output voltage of the solar panels.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">dat</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Power_CellVoltage</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="k">if</span> <span class="n">dat</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">fpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">__file__</span><span class="p">))</span>
+            <span class="n">dat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="n">fpath</span> <span class="o">+</span> <span class="s">&#39;/data/Power/curve.dat&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;LOS&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                         <span class="n">units</span><span class="o">=</span><span class="s">&#39;unitless&#39;</span><span class="p">,</span>
+                         <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Line of Sight over Time&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;temperature&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">n</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                 <span class="n">units</span><span class="o">=</span><span class="s">&quot;degK&quot;</span><span class="p">,</span>
+                                 <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Temperature of solar cells over time&quot;</span><span class="p">,</span>
+                                 <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;exposedArea&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                 <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Exposed area to sun for each solar cell over time&quot;</span><span class="p">,</span>
+                                 <span class="n">units</span><span class="o">=</span><span class="s">&quot;m**2&quot;</span><span class="p">,</span>
+                                 <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;Isetpt&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                            <span class="n">units</span><span class="o">=</span><span class="s">&quot;A&quot;</span><span class="p">,</span>
+                            <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Currents of the solar panels&quot;</span><span class="p">,</span>
+                            <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;V_sol&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                           <span class="n">units</span><span class="o">=</span><span class="s">&quot;V&quot;</span><span class="p">,</span>
+                           <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Output voltage of solar panel over time&quot;</span><span class="p">,</span>
+                           <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">))</span>
+
+        <span class="n">nT</span><span class="p">,</span> <span class="n">nA</span><span class="p">,</span> <span class="n">nI</span> <span class="o">=</span> <span class="n">dat</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">dat</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">3</span> <span class="o">+</span> <span class="n">nT</span><span class="p">]</span>
+        <span class="n">A</span> <span class="o">=</span> <span class="n">dat</span><span class="p">[</span><span class="mi">3</span> <span class="o">+</span> <span class="n">nT</span><span class="p">:</span><span class="mi">3</span> <span class="o">+</span> <span class="n">nT</span> <span class="o">+</span> <span class="n">nA</span><span class="p">]</span>
+        <span class="n">I</span> <span class="o">=</span> <span class="n">dat</span><span class="p">[</span><span class="mi">3</span> <span class="o">+</span> <span class="n">nT</span> <span class="o">+</span> <span class="n">nA</span><span class="p">:</span><span class="mi">3</span> <span class="o">+</span> <span class="n">nT</span> <span class="o">+</span> <span class="n">nA</span> <span class="o">+</span> <span class="n">nI</span><span class="p">]</span>
+        <span class="n">V</span> <span class="o">=</span> <span class="n">dat</span><span class="p">[</span><span class="mi">3</span> <span class="o">+</span> <span class="n">nT</span> <span class="o">+</span> <span class="n">nA</span> <span class="o">+</span> <span class="n">nI</span><span class="p">:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">nT</span><span class="p">,</span> <span class="n">nA</span><span class="p">,</span> <span class="n">nI</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">MBI</span> <span class="o">=</span> <span class="n">MBI</span><span class="o">.</span><span class="n">MBI</span><span class="p">(</span><span class="n">V</span><span class="p">,</span> <span class="p">[</span><span class="n">T</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">I</span><span class="p">],</span> <span class="p">[</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">15</span><span class="p">],</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">84</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xV</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dV_dL</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dV_dT</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dV_dA</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dV_dI</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Power_CellVoltage.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_CellVoltage.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;LOS&#39;</span><span class="p">,</span> <span class="s">&#39;temperature&#39;</span><span class="p">,</span> <span class="s">&#39;exposedArea&#39;</span><span class="p">,</span> <span class="s">&#39;Isetpt&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;V_sol&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Power_CellVoltage.setx"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_CellVoltage.setx">[docs]</a>    <span class="k">def</span> <span class="nf">setx</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="mi">4</span> <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">4</span> <span class="k">else</span> <span class="p">(</span><span class="n">p</span> <span class="o">%</span> <span class="mi">4</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xV</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">temperature</span><span class="p">[</span><span class="n">i</span><span class="p">,:]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xV</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">LOS</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">exposedArea</span><span class="p">[</span><span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">,:]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xV</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Isetpt</span><span class="p">[</span><span class="n">p</span><span class="p">,:]</span>
+</div>
+<div class="viewcode-block" id="Power_CellVoltage.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_CellVoltage.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">setx</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">MBI</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span>
+                                                           <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">V_sol</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">12</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">V_sol</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">raw</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,:]</span><span class="o">.</span><span class="n">T</span>
+</div>
+<div class="viewcode-block" id="Power_CellVoltage.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_CellVoltage.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">MBI</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span>
+                                                                <span class="mi">12</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">MBI</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="mi">2</span><span class="p">)[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span>
+                                                                <span class="mi">12</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw3</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">MBI</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="mi">3</span><span class="p">)[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span>
+                                                                <span class="mi">12</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dV_dL</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dV_dT</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dV_dA</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dV_dI</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="mi">4</span> <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">4</span> <span class="k">else</span> <span class="p">(</span><span class="n">p</span> <span class="o">%</span> <span class="mi">4</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dV_dL</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">raw2</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">exposedArea</span><span class="p">[</span><span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">,:]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dV_dT</span><span class="p">[:,</span> <span class="n">p</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">raw1</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dV_dA</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">raw2</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">LOS</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dV_dI</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">raw3</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">]</span>
+</div>
+<div class="viewcode-block" id="Power_CellVoltage.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_CellVoltage.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;V_sol&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s">&#39;LOS&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dV_dL</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;LOS&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="s">&#39;temperature&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+                    <span class="n">i</span> <span class="o">=</span> <span class="mi">4</span> <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">4</span> <span class="k">else</span> <span class="p">(</span><span class="n">p</span> <span class="o">%</span> <span class="mi">4</span><span class="p">)</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dV_dT</span><span class="p">[:,</span> <span class="n">p</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;temperature&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">,:]</span>
+
+            <span class="k">if</span> <span class="s">&#39;Isetpt&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dV_dI</span><span class="o">.</span><span class="n">T</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Isetpt&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="s">&#39;exposedArea&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span> <span class="o">+=</span> \
+                        <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dV_dA</span><span class="p">[:,:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;exposedArea&#39;</span><span class="p">][:,</span> <span class="n">p</span><span class="p">,:]</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Power_CellVoltage.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_CellVoltage.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;V_sol&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+                <span class="n">i</span> <span class="o">=</span> <span class="mi">4</span> <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">4</span> <span class="k">else</span> <span class="p">(</span><span class="n">p</span> <span class="o">%</span> <span class="mi">4</span><span class="p">)</span>
+                <span class="k">if</span> <span class="s">&#39;LOS&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;LOS&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dV_dL</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span>
+                <span class="k">if</span> <span class="s">&#39;temperature&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;temperature&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dV_dT</span><span class="p">[:,</span> <span class="n">p</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span>
+                <span class="k">if</span> <span class="s">&#39;Isetpt&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Isetpt&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dV_dI</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span>
+                <span class="k">if</span> <span class="s">&#39;exposedArea&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;exposedArea&#39;</span><span class="p">][</span><span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dV_dA</span><span class="p">[:,</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span>
+
+</div></div>
+<div class="viewcode-block" id="Power_SolarPower"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_SolarPower">[docs]</a><span class="k">class</span> <span class="nc">Power_SolarPower</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Compute the output power of the solar panels.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Power_SolarPower</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;Isetpt&#39;</span><span class="p">,</span>
+            <span class="n">Array</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                <span class="n">units</span><span class="o">=</span><span class="s">&quot;A&quot;</span><span class="p">,</span>
+                <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Currents of the solar panels&quot;</span><span class="p">,</span>
+                <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;V_sol&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                           <span class="n">units</span><span class="o">=</span><span class="s">&quot;V&quot;</span><span class="p">,</span>
+                           <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Output voltage of solar panel over time&quot;</span><span class="p">,</span>
+                           <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;P_sol&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;W&quot;</span><span class="p">,</span>
+                                <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Solar panels power over time&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Power_SolarPower.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_SolarPower.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;Isetpt&#39;</span><span class="p">,</span> <span class="s">&#39;V_sol&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;P_sol&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Power_SolarPower.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_SolarPower.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives (i.e., Jacobian). &quot;&quot;&quot;</span>
+        <span class="c"># Derivatives are simple</span>
+        <span class="k">return</span>
+</div>
+<div class="viewcode-block" id="Power_SolarPower.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_SolarPower.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">P_sol</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">P_sol</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V_sol</span><span class="p">[</span><span class="n">p</span><span class="p">,:]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">Isetpt</span><span class="p">[</span><span class="n">p</span><span class="p">,:]</span>
+</div>
+<div class="viewcode-block" id="Power_SolarPower.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_SolarPower.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;P_sol&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s">&#39;V_sol&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_sol&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">Isetpt</span><span class="p">[</span><span class="n">p</span><span class="p">,:]</span>
+
+            <span class="k">if</span> <span class="s">&#39;Isetpt&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_sol&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Isetpt&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">V_sol</span><span class="p">[</span><span class="n">p</span><span class="p">,:]</span>
+</div>
+<div class="viewcode-block" id="Power_SolarPower.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_SolarPower.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;P_sol&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">12</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s">&#39;V_sol&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_sol&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">Isetpt</span><span class="p">[</span><span class="n">p</span><span class="p">,:]</span>
+                <span class="k">if</span> <span class="s">&#39;Isetpt&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Isetpt&#39;</span><span class="p">][</span><span class="n">p</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V_sol</span><span class="p">[</span><span class="n">p</span><span class="p">,:]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_sol&#39;</span><span class="p">]</span>
+
+</div></div>
+<div class="viewcode-block" id="Power_Total"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_Total">[docs]</a><span class="k">class</span> <span class="nc">Power_Total</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Compute the battery power which is the sum of the loads.</span>
+<span class="sd">    This includes a 2-Watt constant power usage that</span>
+<span class="sd">    accounts for the scientific instruments on the satellite</span>
+<span class="sd">    and small actuator inputs in response to disturbance torques.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Power_Total</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;P_sol&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                           <span class="n">units</span><span class="o">=</span><span class="s">&#39;W&#39;</span><span class="p">,</span>
+                           <span class="n">desc</span><span class="o">=</span><span class="s">&#39;Solar panels power over time&#39;</span><span class="p">,</span>
+                           <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;P_comm&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                            <span class="n">units</span><span class="o">=</span><span class="s">&#39;W&#39;</span><span class="p">,</span>
+                            <span class="n">desc</span><span class="o">=</span><span class="s">&#39;Communication power over time&#39;</span><span class="p">,</span>
+                            <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;P_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                          <span class="n">units</span><span class="o">=</span><span class="s">&#39;W&#39;</span><span class="p">,</span>
+                          <span class="n">desc</span><span class="o">=</span><span class="s">&#39;Power used by reaction wheel over time&#39;</span><span class="p">,</span> <span class="c"># qqq ?</span>
+                          <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;P_bat&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                           <span class="n">units</span><span class="o">=</span><span class="s">&#39;W&#39;</span><span class="p">,</span>
+                           <span class="n">desc</span><span class="o">=</span><span class="s">&#39;Battery power over time&#39;</span><span class="p">,</span>
+                           <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Power_Total.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_Total.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;P_sol&#39;</span><span class="p">,</span> <span class="s">&#39;P_comm&#39;</span><span class="p">,</span> <span class="s">&#39;P_RW&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;P_bat&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Power_Total.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_Total.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives (i.e., Jacobian). &quot;&quot;&quot;</span>
+        <span class="c"># Derivatives are simple</span>
+        <span class="k">return</span>
+</div>
+<div class="viewcode-block" id="Power_Total.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_Total.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">P_bat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">P_sol</span> <span class="o">-</span> <span class="mi">5</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">P_comm</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">P_RW</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="mf">2.0</span>
+</div>
+<div class="viewcode-block" id="Power_Total.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_Total.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;P_sol&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_sol&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s">&#39;P_comm&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">5</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_comm&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s">&#39;P_RW&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+</div>
+<div class="viewcode-block" id="Power_Total.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.power.Power_Total.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;P_bat&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s">&#39;P_sol&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_sol&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">][:]</span>
+            <span class="k">if</span> <span class="s">&#39;P_comm&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_comm&#39;</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">5</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s">&#39;P_RW&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">]</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

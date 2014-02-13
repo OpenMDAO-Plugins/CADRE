@@ -1,0 +1,428 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.CADRE_assembly &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.CADRE_assembly</h1><div class="highlight"><pre>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Assembly</span><span class="p">,</span> <span class="n">Component</span>
+<span class="kn">from</span> <span class="nn">openmdao.main.datatypes.api</span> <span class="kn">import</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">Int</span>
+
+<span class="kn">from</span> <span class="nn">.attitude</span> <span class="kn">import</span> <span class="n">Attitude_Angular</span><span class="p">,</span> <span class="n">Attitude_AngularRates</span><span class="p">,</span> <span class="n">Attitude_Attitude</span><span class="p">,</span> \
+     <span class="n">Attitude_Roll</span><span class="p">,</span> <span class="n">Attitude_RotationMtx</span><span class="p">,</span> \
+     <span class="n">Attitude_RotationMtxRates</span><span class="p">,</span> <span class="n">Attitude_Sideslip</span><span class="p">,</span> <span class="n">Attitude_Torque</span>
+<span class="kn">from</span> <span class="nn">.battery</span> <span class="kn">import</span> <span class="n">BatteryConstraints</span><span class="p">,</span> <span class="n">BatteryPower</span><span class="p">,</span> <span class="n">BatterySOC</span>
+<span class="kn">from</span> <span class="nn">.parameters</span> <span class="kn">import</span> <span class="n">BsplineParameters</span>
+<span class="kn">from</span> <span class="nn">.comm</span> <span class="kn">import</span> <span class="n">Comm_AntRotation</span><span class="p">,</span> <span class="n">Comm_AntRotationMtx</span><span class="p">,</span> <span class="n">Comm_BitRate</span><span class="p">,</span> \
+     <span class="n">Comm_DataDownloaded</span><span class="p">,</span> <span class="n">Comm_Distance</span><span class="p">,</span> <span class="n">Comm_EarthsSpin</span><span class="p">,</span> <span class="n">Comm_EarthsSpinMtx</span><span class="p">,</span> \
+     <span class="n">Comm_GainPattern</span><span class="p">,</span> <span class="n">Comm_GSposEarth</span><span class="p">,</span> <span class="n">Comm_GSposECI</span><span class="p">,</span> <span class="n">Comm_LOS</span><span class="p">,</span> <span class="n">Comm_VectorAnt</span><span class="p">,</span> \
+     <span class="n">Comm_VectorBody</span><span class="p">,</span> <span class="n">Comm_VectorECI</span><span class="p">,</span> <span class="n">Comm_VectorSpherical</span>
+<span class="kn">from</span> <span class="nn">.orbit</span> <span class="kn">import</span> <span class="n">Orbit_Initial</span><span class="p">,</span> <span class="n">Orbit_Dynamics</span>
+<span class="kn">from</span> <span class="nn">.reactionwheel</span> <span class="kn">import</span> <span class="n">ReactionWheel_Motor</span><span class="p">,</span> <span class="n">ReactionWheel_Power</span><span class="p">,</span> \
+     <span class="n">ReactionWheel_Torque</span><span class="p">,</span> <span class="n">ReactionWheel_Dynamics</span>
+<span class="kn">from</span> <span class="nn">.solar</span> <span class="kn">import</span> <span class="n">Solar_ExposedArea</span>
+<span class="kn">from</span> <span class="nn">.sun</span> <span class="kn">import</span> <span class="n">Sun_LOS</span><span class="p">,</span> <span class="n">Sun_PositionBody</span><span class="p">,</span> <span class="n">Sun_PositionECI</span><span class="p">,</span> <span class="n">Sun_PositionSpherical</span>
+<span class="kn">from</span> <span class="nn">.thermal_temperature</span> <span class="kn">import</span> <span class="n">ThermalTemperature</span>
+<span class="kn">from</span> <span class="nn">.power</span> <span class="kn">import</span> <span class="n">Power_CellVoltage</span><span class="p">,</span> <span class="n">Power_SolarPower</span><span class="p">,</span> <span class="n">Power_Total</span>
+
+<span class="kn">import</span> <span class="nn">time</span>
+
+
+<div class="viewcode-block" id="CADRE"><a class="viewcode-back" href="../../srcdocs.html#CADRE.CADRE_assembly.CADRE">[docs]</a><span class="k">class</span> <span class="nc">CADRE</span><span class="p">(</span><span class="n">Assembly</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; OpenMDAO implementation of the CADRE model</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">solar_raw1</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">solar_raw2</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">comm_raw</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>
+                 <span class="n">power_raw</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+
+        <span class="nb">super</span><span class="p">(</span><span class="n">CADRE</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="c"># Analysis parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">m</span> <span class="o">=</span> <span class="n">m</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;t&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span>
+                            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;t1&#39;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;t2&#39;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="mf">43200.</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">t2</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">t1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;h&quot;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span> <span class="o">*</span> <span class="n">h</span>
+
+        <span class="c"># Design parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;CP_Isetpt&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="mf">0.2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">12</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">m</span><span class="p">)),</span>
+                 <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">m</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;CP_gamma&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">m</span><span class="p">,)),</span>
+                 <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">m</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;CP_P_comm&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="mf">0.1</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">m</span><span class="p">,)),</span>
+                 <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">m</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;iSOC&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">],</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                 <span class="n">desc</span><span class="o">=</span><span class="s">&quot;initial state of charge&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;cellInstd&quot;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span>
+                 <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Cell/Radiator indication&quot;</span><span class="p">,</span>
+                 <span class="n">low</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;finAngle&quot;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">4.</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;antAngle&quot;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">))</span>
+        
+        <span class="c"># State parameters (?)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;LD&quot;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="mf">5000.</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;lat&quot;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="mf">42.2708</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;lon&quot;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="o">-</span><span class="mf">83.7264</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;alt&quot;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.256</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+        <span class="c"># McMurdo station: -77.85, 166.666667</span>
+        <span class="c"># Ann Arbor: 42.2708, -83.7264</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,),</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                                   <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">))</span>
+
+        <span class="c"># B-spline Parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;BsplineParameters&quot;</span><span class="p">,</span> <span class="n">BsplineParameters</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">m</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;BsplineParameters&quot;</span><span class="p">)</span>
+
+        <span class="c"># Attitude components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_Angular&quot;</span><span class="p">,</span> <span class="n">Attitude_Angular</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_Angular&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_AngularRates&quot;</span><span class="p">,</span> <span class="n">Attitude_AngularRates</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_AngularRates&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_Attitude&quot;</span><span class="p">,</span> <span class="n">Attitude_Attitude</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_Attitude&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_Roll&quot;</span><span class="p">,</span> <span class="n">Attitude_Roll</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_Roll&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_RotationMtx&quot;</span><span class="p">,</span> <span class="n">Attitude_RotationMtx</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_RotationMtx&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_RotationMtxRates&quot;</span><span class="p">,</span> <span class="n">Attitude_RotationMtxRates</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_RotationMtxRates&quot;</span><span class="p">)</span>
+
+        <span class="c">#self.add(&quot;Attitude_Sideslip&quot;, Attitude_Sideslip(n))</span>
+        <span class="c"># self.driver.workflow.add(&quot;Attitude_Sideslip&quot;)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_Torque&quot;</span><span class="p">,</span> <span class="n">Attitude_Torque</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Attitude_Torque&quot;</span><span class="p">)</span>
+
+        <span class="c"># Battery components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;BatteryConstraints&quot;</span><span class="p">,</span> <span class="n">BatteryConstraints</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;BatteryConstraints&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_passthrough</span><span class="p">(</span><span class="s">&quot;BatteryConstraints.ConCh&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_passthrough</span><span class="p">(</span><span class="s">&quot;BatteryConstraints.ConDs&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_passthrough</span><span class="p">(</span><span class="s">&quot;BatteryConstraints.ConS0&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_passthrough</span><span class="p">(</span><span class="s">&quot;BatteryConstraints.ConS1&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;BatteryPower&quot;</span><span class="p">,</span> <span class="n">BatteryPower</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;BatteryPower&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;BatterySOC&quot;</span><span class="p">,</span> <span class="n">BatterySOC</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;BatterySOC&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_passthrough</span><span class="p">(</span><span class="s">&quot;BatterySOC.SOC&quot;</span><span class="p">)</span>
+ 
+        <span class="c"># Comm components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_AntRotation&quot;</span><span class="p">,</span> <span class="n">Comm_AntRotation</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_AntRotation&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_AntRotationMtx&quot;</span><span class="p">,</span> <span class="n">Comm_AntRotationMtx</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_AntRotationMtx&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_BitRate&quot;</span><span class="p">,</span> <span class="n">Comm_BitRate</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_BitRate&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_DataDownloaded&quot;</span><span class="p">,</span> <span class="n">Comm_DataDownloaded</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_DataDownloaded&quot;</span><span class="p">)</span>
+        <span class="c"># self.create_passthrough(&quot;Comm_DataDownloaded.Data_Final&quot;)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">create_passthrough</span><span class="p">(</span><span class="s">&quot;Comm_DataDownloaded.Data&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_Distance&quot;</span><span class="p">,</span> <span class="n">Comm_Distance</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_Distance&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_EarthsSpin&quot;</span><span class="p">,</span> <span class="n">Comm_EarthsSpin</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_EarthsSpin&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_EarthsSpinMtx&quot;</span><span class="p">,</span> <span class="n">Comm_EarthsSpinMtx</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_EarthsSpinMtx&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_GainPattern&quot;</span><span class="p">,</span> <span class="n">Comm_GainPattern</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">comm_raw</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_GainPattern&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_GSposEarth&quot;</span><span class="p">,</span> <span class="n">Comm_GSposEarth</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_GSposEarth&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_GSposECI&quot;</span><span class="p">,</span> <span class="n">Comm_GSposECI</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_GSposECI&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_LOS&quot;</span><span class="p">,</span> <span class="n">Comm_LOS</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_LOS&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_VectorAnt&quot;</span><span class="p">,</span> <span class="n">Comm_VectorAnt</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_VectorAnt&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_VectorBody&quot;</span><span class="p">,</span> <span class="n">Comm_VectorBody</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_VectorBody&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_VectorECI&quot;</span><span class="p">,</span> <span class="n">Comm_VectorECI</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_VectorECI&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_VectorSpherical&quot;</span><span class="p">,</span> <span class="n">Comm_VectorSpherical</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Comm_VectorSpherical&quot;</span><span class="p">)</span>
+ 
+        <span class="c"># Orbit components</span>
+        <span class="c">#self.add(&quot;Orbit_Initial&quot;, Orbit_Initial())</span>
+        <span class="c">#self.driver.workflow.add(&quot;Orbit_Initial&quot;)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Orbit_Dynamics&quot;</span><span class="p">,</span> <span class="n">Orbit_Dynamics</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Orbit_Dynamics&quot;</span><span class="p">)</span>
+ 
+        <span class="c"># Power</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Power_CellVoltage&quot;</span><span class="p">,</span> <span class="n">Power_CellVoltage</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">power_raw</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Power_CellVoltage&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Power_SolarPower&quot;</span><span class="p">,</span> <span class="n">Power_SolarPower</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Power_SolarPower&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Power_Total&quot;</span><span class="p">,</span> <span class="n">Power_Total</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Power_Total&quot;</span><span class="p">)</span>
+ 
+        <span class="c"># Reaction wheel components</span>
+        <span class="c">#self.add(&quot;ReactionWheel_Motor&quot;, ReactionWheel_Motor(n))</span>
+        <span class="c"># self.driver.workflow.add(&quot;ReactionWheel_Motor&quot;)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;ReactionWheel_Power&quot;</span><span class="p">,</span> <span class="n">ReactionWheel_Power</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;ReactionWheel_Power&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;ReactionWheel_Torque&quot;</span><span class="p">,</span> <span class="n">ReactionWheel_Torque</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;ReactionWheel_Torque&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;ReactionWheel_Dynamics&quot;</span><span class="p">,</span> <span class="n">ReactionWheel_Dynamics</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;ReactionWheel_Dynamics&quot;</span><span class="p">)</span>
+ 
+        <span class="c"># Solar</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Solar_ExposedArea&quot;</span><span class="p">,</span> <span class="n">Solar_ExposedArea</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">solar_raw1</span><span class="p">,</span>
+                                                        <span class="n">solar_raw2</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Solar_ExposedArea&quot;</span><span class="p">)</span>
+ 
+        <span class="c"># Sun components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Sun_LOS&quot;</span><span class="p">,</span> <span class="n">Sun_LOS</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Sun_LOS&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Sun_PositionBody&quot;</span><span class="p">,</span> <span class="n">Sun_PositionBody</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Sun_PositionBody&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Sun_PositionECI&quot;</span><span class="p">,</span> <span class="n">Sun_PositionECI</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Sun_PositionECI&quot;</span><span class="p">)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Sun_PositionSpherical&quot;</span><span class="p">,</span> <span class="n">Sun_PositionSpherical</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;Sun_PositionSpherical&quot;</span><span class="p">)</span>
+ 
+        <span class="c"># Thermal temp components</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;ThermalTemperature&quot;</span><span class="p">,</span> <span class="n">ThermalTemperature</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;ThermalTemperature&quot;</span><span class="p">)</span>
+ 
+        <span class="c">#self.add(&quot;debug&quot;, debug())</span>
+        <span class="c">#self.debug.force_execute = True</span>
+        <span class="c"># self.driver.workflow.add(&quot;debug&quot;)</span>
+ 
+        <span class="bp">self</span><span class="o">.</span><span class="n">make_connections</span><span class="p">()</span>
+ 
+<div class="viewcode-block" id="CADRE.get_unconnected_inputs"><a class="viewcode-back" href="../../srcdocs.html#CADRE.CADRE_assembly.CADRE.get_unconnected_inputs">[docs]</a>    <span class="k">def</span> <span class="nf">get_unconnected_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">unconnected_inputs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">connected_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_dataflow</span><span class="p">()[</span><span class="s">&#39;connections&#39;</span><span class="p">]]</span>
+        <span class="n">defaults</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;itername&#39;</span><span class="p">,</span> <span class="s">&#39;force_execute&#39;</span><span class="p">,</span> <span class="s">&#39;directory&#39;</span><span class="p">,</span> <span class="s">&#39;exec_count&#39;</span><span class="p">,</span>
+                    <span class="s">&#39;derivative_exec_count&#39;</span><span class="p">,</span> <span class="s">&#39;fixed_external_vars&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">compname</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">list_components</span><span class="p">()</span> <span class="o">+</span> <span class="p">[</span><span class="s">&#39;self&#39;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">compname</span> <span class="o">==</span> <span class="s">&quot;driver&quot;</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">comp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">compname</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">comp</span><span class="o">.</span><span class="n">list_inputs</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">defaults</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">fullname</span> <span class="o">=</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">compname</span><span class="p">,</span> <span class="n">var</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">fullname</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">connected_inputs</span><span class="p">:</span>
+                    <span class="n">unconnected_inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fullname</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">unconnected_inputs</span>
+</div>
+<div class="viewcode-block" id="CADRE.make_connections"><a class="viewcode-back" href="../../srcdocs.html#CADRE.CADRE_assembly.CADRE.make_connections">[docs]</a>    <span class="k">def</span> <span class="nf">make_connections</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collects the names of all input and output variables for all</span>
+<span class="sd">        components within the assembly (drivers excluded).</span>
+<span class="sd">        Then establishes connections between</span>
+<span class="sd">        any output variable and input variable that has the same name so</span>
+<span class="sd">        long as the variable name does not exist as an output to more than</span>
+<span class="sd">        a single component (so excludes default outputs).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+ 
+        <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span> <span class="o">=</span> <span class="p">{},</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">compname</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">list_components</span><span class="p">():</span>
+ 
+            <span class="n">comp_inputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">compname</span><span class="p">)</span><span class="o">.</span><span class="n">list_inputs</span><span class="p">()</span>
+ 
+            <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="n">comp_inputs</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">input_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
+                    <span class="n">inputs</span><span class="p">[</span><span class="n">input_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">compname</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">inputs</span><span class="p">[</span><span class="n">input_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">compname</span><span class="p">)</span>
+ 
+            <span class="n">comp_outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">compname</span><span class="p">)</span><span class="o">.</span><span class="n">list_outputs</span><span class="p">()</span>
+ 
+            <span class="k">for</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="n">comp_outputs</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">output_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">outputs</span><span class="p">:</span>
+                    <span class="n">outputs</span><span class="p">[</span><span class="n">output_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">compname</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">outputs</span><span class="p">[</span><span class="n">output_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">compname</span><span class="p">)</span>
+                    
+        <span class="n">io</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c">#print &quot;{0},{1},{2},{3}&quot;.format(</span>
+             <span class="c">#&quot;Variable&quot;,</span>
+             <span class="c">#&quot;Component&quot;,</span>
+             <span class="c">#&quot;Units&quot;,</span>
+             <span class="c">#&quot;Description&quot;</span>
+         <span class="c">#)</span>
+ 
+        <span class="k">for</span> <span class="n">compname</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">list_components</span><span class="p">():</span>
+            <span class="n">comp_io</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">compname</span><span class="p">)</span><span class="o">.</span><span class="n">list_inputs</span><span class="p">()</span> <span class="o">+</span> \
+                <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">compname</span><span class="p">)</span><span class="o">.</span><span class="n">list_outputs</span><span class="p">()</span>
+
+            <span class="k">for</span> <span class="n">io_name</span> <span class="ow">in</span> <span class="n">comp_io</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">io_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;derivative_exec_count&#39;</span><span class="p">,</span>
+                                   <span class="s">&#39;directory&#39;</span><span class="p">,</span>
+                                   <span class="s">&#39;exec_count&#39;</span><span class="p">,</span>
+                                   <span class="s">&#39;external_vars&#39;</span><span class="p">,</span>
+                                   <span class="s">&#39;fixed_external_vars&#39;</span><span class="p">,</span>
+                                   <span class="s">&#39;force_execute&#39;</span><span class="p">,</span>
+                                   <span class="s">&#39;init_state_var&#39;</span><span class="p">,</span>
+                                   <span class="s">&#39;itername&#39;</span><span class="p">,</span>
+                                   <span class="s">&#39;state_var&#39;</span><span class="p">,</span>
+                                   <span class="p">]:</span>
+
+                    <span class="k">if</span> <span class="n">io_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">io</span><span class="p">:</span>
+                        <span class="n">io</span><span class="p">[</span><span class="n">io_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">compname</span><span class="p">]</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">io</span><span class="p">[</span><span class="n">io_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">compname</span><span class="p">)</span>
+ 
+        <span class="k">for</span> <span class="n">io_name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span> <span class="n">io</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="p">):</span>
+            <span class="k">for</span> <span class="n">compname</span> <span class="ow">in</span> <span class="n">io</span><span class="p">[</span> <span class="n">io_name</span> <span class="p">]</span> <span class="p">:</span>
+                <span class="n">p</span> <span class="o">=</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span> <span class="p">[</span><span class="n">compname</span><span class="p">,</span> <span class="n">io_name</span><span class="p">]</span> <span class="p">)</span>
+                <span class="n">metadata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_metadata</span><span class="p">(</span> <span class="n">p</span> <span class="p">)</span>
+                <span class="c">#print p, metadata.get(&#39;units&#39;,&#39;None&#39;), metadata.get(&#39;desc&#39;,&#39;None&#39;)</span>
+                <span class="c">#print &quot;{0},{1},{2},\&quot;{3}\&quot;&quot;.format(</span>
+                     <span class="c">#io_name,</span>
+                     <span class="c">#compname,</span>
+                     <span class="c">#metadata.get(&#39;units&#39;,&#39;None&#39;),</span>
+                     <span class="c">#metadata.get(&#39;desc&#39;,&#39;None&#39;)</span>
+                 <span class="c">#)</span>
+ 
+                <span class="c"># if input_name not in [ &#39;directory&#39;, &#39;force_execute&#39;, &#39;state_var&#39;, &#39;init_state_var&#39;,&#39;external_vars&#39;,&#39;fixed_external_vars&#39; ]:</span>
+                <span class="c">#     p = &#39;.&#39;.join( [compname, input_name] )</span>
+                <span class="c">#     metadata = self.get_metadata( p )</span>
+                <span class="c">#     print p, metadata.get(&#39;units&#39;,&#39;None&#39;), metadata.get(&#39;desc&#39;,&#39;None&#39;)</span>
+ 
+        <span class="n">assym_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">list_inputs</span><span class="p">()</span>
+        <span class="n">assym_level</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s">&#39;directory&#39;</span><span class="p">)</span>
+        <span class="n">assym_level</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s">&#39;force_execute&#39;</span><span class="p">)</span>
+ 
+        <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">assym_level</span><span class="p">:</span>
+            <span class="n">outputs</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;&#39;</span><span class="p">]</span>
+ 
+        <span class="k">for</span> <span class="n">varname</span> <span class="ow">in</span> <span class="n">outputs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">comps</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="n">varname</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">comps</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">comps</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                <span class="n">frompath</span> <span class="o">=</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">comps</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">varname</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">frompath</span> <span class="o">=</span> <span class="n">varname</span>
+                
+            <span class="k">if</span> <span class="n">varname</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">compname</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">[</span><span class="n">varname</span><span class="p">]:</span>
+                    <span class="n">topath</span> <span class="o">=</span> <span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">compname</span><span class="p">,</span> <span class="n">varname</span><span class="p">])</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">frompath</span><span class="p">,</span> <span class="n">topath</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

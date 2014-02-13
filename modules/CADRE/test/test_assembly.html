@@ -1,0 +1,477 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.test.test_assembly &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../../index.html" />
+    <link rel="up" title="Module code" href="../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.test.test_assembly</h1><div class="highlight"><pre>
+<span class="kn">import</span> <span class="nn">unittest</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Assembly</span><span class="p">,</span> <span class="n">set_as_top</span>
+<span class="kn">from</span> <span class="nn">openmdao.util.testutil</span> <span class="kn">import</span> <span class="n">assert_rel_error</span>
+
+<span class="kn">from</span> <span class="nn">CADRE</span> <span class="kn">import</span> <span class="n">CADRE</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="c"># Ignore the numerical warnings from performing the rel error calc.</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="s">&quot;ignore&quot;</span><span class="p">)</span>
+
+
+<span class="n">idx</span> <span class="o">=</span> <span class="s">&#39;0&#39;</span>
+
+<span class="n">setd</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">fpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">__file__</span><span class="p">))</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">fpath</span> <span class="o">+</span> <span class="s">&quot;/data1346.pkl&quot;</span><span class="p">,</span> <span class="s">&#39;rb&#39;</span><span class="p">))</span>
+
+<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+    <span class="k">if</span> <span class="n">key</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">idx</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">key</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">isdigit</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">isdigit</span><span class="p">():</span>
+            <span class="n">shortkey</span> <span class="o">=</span> <span class="n">key</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">shortkey</span> <span class="o">=</span> <span class="n">key</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span>
+        <span class="c"># set floats correctly</span>
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="ow">and</span> <span class="n">shortkey</span> <span class="o">!=</span> <span class="s">&quot;iSOC&quot;</span><span class="p">:</span>
+            <span class="n">setd</span><span class="p">[</span><span class="n">shortkey</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">setd</span><span class="p">[</span><span class="n">shortkey</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+<span class="n">n</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;P_comm&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">size</span>
+<span class="n">m</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;CP_P_comm&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">size</span>
+
+<span class="n">assembly</span> <span class="o">=</span> <span class="n">set_as_top</span><span class="p">(</span><span class="n">CADRE</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">m</span><span class="p">))</span>
+
+<span class="n">setd</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span>
+<span class="n">setd</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="s">&quot;:r_e2b_I0&quot;</span><span class="p">]</span>
+<span class="n">setd</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][</span><span class="mi">3</span><span class="p">:]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="s">&quot;:v_e2b_I0&quot;</span><span class="p">]</span>
+<span class="n">setd</span><span class="p">[</span><span class="s">&#39;Gamma&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="s">&quot;:gamma&quot;</span><span class="p">]</span>
+
+<span class="n">assembly</span><span class="o">.</span><span class="n">CP_P_comm</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;CP_P_comm&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">LD</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;LD&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">cellInstd</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;cellInstd&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">CP_gamma</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;CP_gamma&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">finAngle</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;finAngle&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">lon</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;lon&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">CP_Isetpt</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;CP_Isetpt&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">antAngle</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;antAngle&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">t</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;t&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">r_e2b_I0</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">lat</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;lat&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">alt</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;alt&#39;</span><span class="p">]</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">iSOC</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="s">&#39;iSOC&#39;</span><span class="p">]</span>
+
+
+<span class="c">#assembly.print_set_vals(setvals=setd, printvals=&quot;none&quot;)</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+
+<span class="k">class</span> <span class="nc">Testcase_CADRE_assembly</span><span class="p">(</span><span class="n">unittest</span><span class="o">.</span><span class="n">TestCase</span><span class="p">):</span>
+<div class="viewcode-block" id="Testcase_CADRE_assembly"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly">[docs]</a>
+    <span class="sd">&quot;&quot;&quot; Tests the CADRE assembly. &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">):</span>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.compare"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.compare">[docs]</a>        <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">inputs</span> <span class="o">+</span> <span class="n">outputs</span><span class="p">:</span>
+            <span class="n">computed</span> <span class="o">=</span> <span class="n">assembly</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">compname</span><span class="p">,</span> <span class="n">var</span><span class="p">]))</span>
+            <span class="n">actual</span> <span class="o">=</span> <span class="n">setd</span><span class="p">[</span><span class="n">var</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">computed</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+                <span class="n">rel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span>
+                    <span class="n">actual</span> <span class="o">-</span> <span class="n">computed</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">actual</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rel</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">actual</span> <span class="o">-</span> <span class="n">computed</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">actual</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">actual</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1e-3</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">computed</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1e-3</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="n">rel</span> <span class="o">&lt;=</span> <span class="mf">1e-3</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_DataDownloaded</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_DataDownloaded"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_DataDownloaded">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_DataDownloaded&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;Dr&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;Data&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_AntRotation</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_AntRotation"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_AntRotation">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_AntRotation&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;antAngle&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;q_A&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_BitRate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_BitRate"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_BitRate">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_BitRate&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;P_comm&#39;</span><span class="p">,</span> <span class="s">&#39;gain&#39;</span><span class="p">,</span> <span class="s">&#39;GSdist&#39;</span><span class="p">,</span> <span class="s">&#39;CommLOS&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;Dr&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_Distance</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_Distance"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_Distance">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_Distance&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_b2g_A&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;GSdist&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_EarthsSpin</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_EarthsSpin"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_EarthsSpin">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_EarthsSpin&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;t&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;q_E&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_EarthsSpinMtx</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_EarthsSpinMtx"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_EarthsSpinMtx">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_EarthsSpinMtx&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;q_E&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_IE&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_GainPattern</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_GainPattern"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_GainPattern">[docs]</a>        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_GainPattern&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;azimuthGS&#39;</span><span class="p">,</span> <span class="s">&#39;elevationGS&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;gain&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_GSposEarth</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_GSposEarth"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_GSposEarth">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_GSposEarth&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;lon&#39;</span><span class="p">,</span> <span class="s">&#39;lat&#39;</span><span class="p">,</span> <span class="s">&#39;alt&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_e2g_E&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_GSposECI</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_GSposECI"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_GSposECI">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_GSposECI&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_IE&#39;</span><span class="p">,</span> <span class="s">&#39;r_e2g_E&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_e2g_I&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_LOS</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_LOS"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_LOS">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_LOS&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_b2g_I&#39;</span><span class="p">,</span> <span class="s">&#39;r_e2g_I&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;CommLOS&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_VectorAnt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_VectorAnt"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_VectorAnt">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_VectorAnt&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_b2g_B&#39;</span><span class="p">,</span> <span class="s">&#39;O_AB&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_b2g_A&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_VectorBody</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_VectorBody"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_VectorBody">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_VectorBody&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_b2g_I&#39;</span><span class="p">,</span> <span class="s">&#39;O_BI&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_b2g_B&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_VectorECI</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_VectorECI"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_VectorECI">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_VectorECI&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_e2g_I&#39;</span><span class="p">,</span> <span class="s">&#39;r_e2b_I&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_b2g_I&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Comm_VectorSpherical</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Comm_VectorSpherical"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Comm_VectorSpherical">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Comm_VectorSpherical&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_b2g_A&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;azimuthGS&#39;</span><span class="p">,</span> <span class="s">&#39;elevationGS&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_ThermalTemperature</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_ThermalTemperature"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_ThermalTemperature">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;ThermalTemperature&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;exposedArea&#39;</span><span class="p">,</span> <span class="s">&#39;cellInstd&#39;</span><span class="p">,</span> <span class="s">&#39;LOS&#39;</span><span class="p">,</span> <span class="s">&#39;P_comm&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;temperature&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Attitude_Angular</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Attitude_Angular"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Attitude_Angular">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Attitude_Angular&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="s">&#39;Odot_BI&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Attitude_AngularRates</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Attitude_AngularRates"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Attitude_AngularRates">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Attitude_AngularRates&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Attitude_Attitude</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Attitude_Attitude"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Attitude_Attitude">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Attitude_Attitude&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_RI&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Attitude_Roll</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Attitude_Roll"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Attitude_Roll">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Attitude_Roll&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;Gamma&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_BR&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Attitude_RotationMtx</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Attitude_RotationMtx"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Attitude_RotationMtx">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Attitude_RotationMtx&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_BR&#39;</span><span class="p">,</span> <span class="s">&#39;O_RI&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Attitude_RotationMtxRates</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Attitude_RotationMtxRates"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Attitude_RotationMtxRates">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Attitude_RotationMtxRates&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="c"># def test_Attitude_Sideslip(self):</span>
+
+    <span class="c">#     compname = &#39;Attitude_Sideslip&#39;</span>
+    <span class="c">#     inputs = [&#39;r_e2b_I&#39;, &#39;O_BI&#39;]</span>
+    <span class="c">#     outputs = [&#39;v_e2b_B&#39;]</span>
+
+    <span class="c">#     self.compare(compname, inputs, outputs)</span>
+
+    <span class="k">def</span> <span class="nf">test_Attitude_Torque</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Attitude_Torque"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Attitude_Torque">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Attitude_Torque&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="s">&#39;wdot_B&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;T_tot&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Sun_LOS</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Sun_LOS"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Sun_LOS">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Sun_LOS&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,</span> <span class="s">&#39;r_e2s_I&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;LOS&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Sun_PositionBody</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Sun_PositionBody"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Sun_PositionBody">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Sun_PositionBody&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="s">&#39;r_e2s_I&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Sun_PositionECI</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Sun_PositionECI"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Sun_PositionECI">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Sun_PositionECI&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;t&#39;</span><span class="p">,</span> <span class="s">&#39;LD&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Sun_PositionSpherical</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Sun_PositionSpherical"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Sun_PositionSpherical">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Sun_PositionSpherical&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;azimuth&#39;</span><span class="p">,</span> <span class="s">&#39;elevation&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Solar_ExposedArea</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Solar_ExposedArea"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Solar_ExposedArea">[docs]</a>        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Solar_ExposedArea&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;finAngle&#39;</span><span class="p">,</span> <span class="s">&#39;azimuth&#39;</span><span class="p">,</span> <span class="s">&#39;elevation&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;exposedArea&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Power_CellVoltage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Power_CellVoltage"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Power_CellVoltage">[docs]</a>        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Power_CellVoltage&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;LOS&#39;</span><span class="p">,</span> <span class="s">&#39;temperature&#39;</span><span class="p">,</span> <span class="s">&#39;exposedArea&#39;</span><span class="p">,</span> <span class="s">&#39;Isetpt&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Power_SolarPower</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Power_SolarPower"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Power_SolarPower">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Power_SolarPower&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;V_sol&#39;</span><span class="p">,</span> <span class="s">&#39;Isetpt&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;P_sol&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_Power_Total</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_Power_Total"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_Power_Total">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;Power_Total&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;P_sol&#39;</span><span class="p">,</span> <span class="s">&#39;P_comm&#39;</span><span class="p">,</span> <span class="s">&#39;P_RW&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="c"># def test_ReactionWheel_Motor(self):</span>
+
+    <span class="c">#     compname = &#39;ReactionWheel_Motor&#39;</span>
+    <span class="c">#     inputs = [&#39;T_RW&#39;, &#39;w_B&#39;, &#39;w_RW&#39;]</span>
+    <span class="c">#     outputs = [&#39;T_m&#39;]</span>
+
+    <span class="c">#     self.compare(compname, inputs, outputs)</span>
+
+    <span class="k">def</span> <span class="nf">test_ReactionWheel_Dynamics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_ReactionWheel_Dynamics"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_ReactionWheel_Dynamics">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;ReactionWheel_Dynamics&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="s">&#39;T_RW&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;w_RW&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_ReactionWheel_Power</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_ReactionWheel_Power"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_ReactionWheel_Power">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;ReactionWheel_Power&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;w_RW&#39;</span><span class="p">,</span> <span class="s">&#39;T_RW&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;P_RW&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_ReactionWheel_Torque</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_ReactionWheel_Torque"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_ReactionWheel_Torque">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;ReactionWheel_Torque&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;T_tot&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;T_RW&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_BatterySOC</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_BatterySOC"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_BatterySOC">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;BatterySOC&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">,</span> <span class="s">&#39;temperature&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_BatteryPower</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_BatteryPower"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_BatteryPower">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;BatteryPower&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">,</span> <span class="s">&#39;temperature&#39;</span><span class="p">,</span> <span class="s">&#39;P_bat&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">test_BatteryConstraints</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></div>
+<div class="viewcode-block" id="Testcase_CADRE_assembly.test_BatteryConstraints"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_assembly.Testcase_CADRE_assembly.test_BatteryConstraints">[docs]</a>
+        <span class="n">compname</span> <span class="o">=</span> <span class="s">&#39;BatteryConstraints&#39;</span>
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">,</span> <span class="s">&#39;SOC&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;ConCh&#39;</span><span class="p">,</span> <span class="s">&#39;ConDs&#39;</span><span class="p">,</span> <span class="s">&#39;ConS0&#39;</span><span class="p">,</span> <span class="s">&#39;ConS1&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">compname</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&quot;__main__&quot;</span><span class="p">:</span></div></div>
+
+    <span class="n">unittest</span><span class="o">.</span><span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

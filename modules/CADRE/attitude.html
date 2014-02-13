@@ -1,0 +1,865 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.attitude &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.attitude</h1><div class="highlight"><pre>
+<span class="sd">&#39;&#39;&#39; Attitude discipline for CADRE &#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.lib.datatypes.api</span> <span class="kn">import</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Array</span>
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Component</span>
+
+<span class="kn">from</span> <span class="nn">CADRE.kinematics</span> <span class="kn">import</span> <span class="n">computepositionrotd</span><span class="p">,</span> <span class="n">computepositionrotdjacobian</span>
+
+<span class="c"># Allow non-standard variable names for scientific calc</span>
+<span class="c"># pylint: disable-msg=C0103</span>
+
+
+<div class="viewcode-block" id="Attitude_Angular"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Angular">[docs]</a><span class="k">class</span> <span class="nc">Attitude_Angular</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot; Calculates angular velocity vector from the satellite&#39;s orientation</span>
+<span class="sd">    matrix and its derivative.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Attitude_Angular</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from body-fixed frame to Earth-centered inertial frame over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                                  <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;First derivative of O_BI over time&quot;</span><span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                              <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                              <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Angular velocity vector in body-fixed frame over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dw_dOdot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dw_dO</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="Attitude_Angular.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Angular.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dw_dOdot</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="mi">1</span><span class="p">,:,</span> <span class="n">i</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dw_dO</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="mi">2</span><span class="p">,:,</span> <span class="n">i</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">dw_dOdot</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="mi">2</span><span class="p">,:,</span> <span class="n">i</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dw_dO</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="mi">0</span><span class="p">,:,</span> <span class="n">i</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">dw_dOdot</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="mi">0</span><span class="p">,:,</span> <span class="n">i</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dw_dO</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="mi">1</span><span class="p">,:,</span> <span class="n">i</span><span class="p">]</span>
+</div>
+<div class="viewcode-block" id="Attitude_Angular.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Angular.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="mi">1</span><span class="p">,:,</span> <span class="n">i</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="mi">2</span><span class="p">,:,</span> <span class="n">i</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="mi">0</span><span class="p">,:,</span> <span class="n">i</span><span class="p">])</span>
+</div>
+<div class="viewcode-block" id="Attitude_Angular.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Angular.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="s">&#39;Odot_BI&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Attitude_Angular.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Angular.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;w_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dw_dO</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                                <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span>
+                        <span class="k">if</span> <span class="s">&#39;Odot_BI&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dw_dOdot</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                                <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span>
+</div>
+<div class="viewcode-block" id="Attitude_Angular.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Angular.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;w_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dw_dO</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                                <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span>
+                        <span class="k">if</span> <span class="s">&#39;Odot_BI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dw_dOdot</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                                <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span>
+
+</div></div>
+<div class="viewcode-block" id="Attitude_AngularRates"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_AngularRates">[docs]</a><span class="k">class</span> <span class="nc">Attitude_AngularRates</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot; Calculates time derivative of angular velocity vector.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Attitude_AngularRates</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                              <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                              <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Angular velocity vector in body-fixed frame over time&quot;</span>
+                              <span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;h&#39;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="mf">28.8</span><span class="p">,</span>
+                            <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                            <span class="n">units</span><span class="o">=</span><span class="s">&quot;s&quot;</span><span class="p">,</span>
+                            <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Time step for RK4 integration&quot;</span>
+                            <span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+            <span class="s">&#39;wdot_B&#39;</span><span class="p">,</span>
+            <span class="n">Array</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s**2&quot;</span><span class="p">,</span>
+                <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Time derivative of w_B over time&quot;</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="Attitude_AngularRates.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_AngularRates.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="c"># Calculation is fairly simple, so not cached.</span>
+        <span class="k">return</span>
+</div>
+<div class="viewcode-block" id="Attitude_AngularRates.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_AngularRates.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="s">&#39;h&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;wdot_B&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Attitude_AngularRates.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_AngularRates.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wdot_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wdot_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wdot_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wdot_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wdot_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wdot_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+</div>
+<div class="viewcode-block" id="Attitude_AngularRates.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_AngularRates.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;w_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;wdot_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+</div>
+<div class="viewcode-block" id="Attitude_AngularRates.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_AngularRates.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;wdot_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;w_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+
+</div></div>
+<div class="viewcode-block" id="Attitude_Attitude"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Attitude">[docs]</a><span class="k">class</span> <span class="nc">Attitude_Attitude</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot; Coordinate transformation from the interial plane to the rolled</span>
+<span class="sd">    (forward facing) plane.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dvx_dv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">)</span>
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">)</span>
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+    <span class="n">dvx_dv</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Attitude_Attitude</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                                  <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position and velocity vector from earth to satellite in Earth-centered inertial frame over time&quot;</span><span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_RI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from rolled body-fixed frame to Earth-centerd inertial frame over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dO_dr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Attitude_Attitude.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Attitude.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;O_RI&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Attitude_Attitude.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Attitude.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="n">diB_dv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="n">djB_dv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+
+            <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="n">i</span><span class="p">]</span>
+
+            <span class="n">normr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">r</span><span class="p">))</span>
+            <span class="n">normv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">))</span>
+
+            <span class="c"># Prevent overflow</span>
+            <span class="k">if</span> <span class="n">normr</span> <span class="o">&lt;</span> <span class="mf">1e-10</span><span class="p">:</span>
+                <span class="n">normr</span> <span class="o">=</span> <span class="mf">1e-10</span>
+            <span class="k">if</span> <span class="n">normv</span> <span class="o">&lt;</span> <span class="mf">1e-10</span><span class="p">:</span>
+                <span class="n">normv</span> <span class="o">=</span> <span class="mf">1e-10</span>
+
+            <span class="n">r</span> <span class="o">=</span> <span class="n">r</span> <span class="o">/</span> <span class="n">normr</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">v</span> <span class="o">/</span> <span class="n">normv</span>
+
+            <span class="n">dr_dr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+            <span class="n">dv_dv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+                <span class="n">dr_dr</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">normr</span>
+                <span class="n">dv_dv</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">normv</span>
+                <span class="n">dr_dr</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span>
+                    <span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">/</span> <span class="n">normr</span> <span class="o">**</span> <span class="mi">3</span>
+                <span class="n">dv_dv</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span>
+                    <span class="mi">3</span><span class="p">:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span><span class="mi">3</span> <span class="o">+</span> <span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">/</span> <span class="n">normv</span> <span class="o">**</span> <span class="mi">3</span>
+
+            <span class="n">vx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+            <span class="n">vx</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">vx</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">vx</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mf">0.</span><span class="p">)</span>
+
+            <span class="n">iB</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">vx</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span>
+
+            <span class="n">diB_dr</span> <span class="o">=</span> <span class="n">vx</span>
+            <span class="n">diB_dv</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dvx_dv</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">r</span><span class="p">)</span>
+            <span class="n">diB_dv</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dvx_dv</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">r</span><span class="p">)</span>
+            <span class="n">diB_dv</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dvx_dv</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">r</span><span class="p">)</span>
+
+            <span class="n">djB_diB</span> <span class="o">=</span> <span class="o">-</span><span class="n">vx</span>
+            <span class="n">djB_dv</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dvx_dv</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">iB</span><span class="p">)</span>
+            <span class="n">djB_dv</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dvx_dv</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">iB</span><span class="p">)</span>
+            <span class="n">djB_dv</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dvx_dv</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">iB</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">dO_dr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">diB_dr</span><span class="p">,</span> <span class="n">dr_dr</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dO_dr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">3</span><span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">diB_dv</span><span class="p">,</span> <span class="n">dv_dv</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">dO_dr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">djB_diB</span><span class="p">,</span> <span class="n">diB_dr</span><span class="p">),</span> <span class="n">dr_dr</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dO_dr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">3</span><span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">djB_diB</span><span class="p">,</span> <span class="n">diB_dv</span><span class="p">)</span> <span class="o">+</span> <span class="n">djB_dv</span><span class="p">,</span>
+                                            <span class="n">dv_dv</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">dO_dr</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">3</span><span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">dv_dv</span>
+</div>
+<div class="viewcode-block" id="Attitude_Attitude.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Attitude.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">O_RI</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">O_RI</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+
+            <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="n">i</span><span class="p">]</span>
+
+            <span class="n">normr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">r</span><span class="p">))</span>
+            <span class="n">normv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">))</span>
+
+            <span class="c"># Prevent overflow</span>
+            <span class="k">if</span> <span class="n">normr</span> <span class="o">&lt;</span> <span class="mf">1e-10</span><span class="p">:</span>
+                <span class="n">normr</span> <span class="o">=</span> <span class="mf">1e-10</span>
+            <span class="k">if</span> <span class="n">normv</span> <span class="o">&lt;</span> <span class="mf">1e-10</span><span class="p">:</span>
+                <span class="n">normv</span> <span class="o">=</span> <span class="mf">1e-10</span>
+
+            <span class="n">r</span> <span class="o">=</span> <span class="n">r</span> <span class="o">/</span> <span class="n">normr</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">v</span> <span class="o">/</span> <span class="n">normv</span>
+
+            <span class="n">vx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+            <span class="n">vx</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">vx</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">vx</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mf">0.</span><span class="p">)</span>
+
+            <span class="n">iB</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">vx</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span>
+            <span class="n">jB</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">vx</span><span class="p">,</span> <span class="n">iB</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">O_RI</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">iB</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">O_RI</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">jB</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">O_RI</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">v</span>
+</div>
+<div class="viewcode-block" id="Attitude_Attitude.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Attitude.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2b_I&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;O_RI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">):</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_RI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dO_dr</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">*</span> \
+                            <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span>
+</div>
+<div class="viewcode-block" id="Attitude_Attitude.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Attitude.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;O_RI&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;r_e2b_I&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">):</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">][</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dO_dr</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">*</span> \
+                            <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_RI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span>
+
+</div></div>
+<div class="viewcode-block" id="Attitude_Roll"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Roll">[docs]</a><span class="k">class</span> <span class="nc">Attitude_Roll</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot; Calculates the body-fixed orientation matrix.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Attitude_Roll</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;Gamma&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">),</span>
+                                <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span>
+                                <span class="n">units</span><span class="o">=</span><span class="s">&quot;rad&quot;</span><span class="p">,</span>
+                                <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Satellite roll angle over time&quot;</span><span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_BR&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from body-fixed frame to rolled body-fixed frame over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="Attitude_Roll.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Roll.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;Gamma&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;O_BR&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Attitude_Roll.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Roll.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Gamma</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Gamma</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+</div>
+<div class="viewcode-block" id="Attitude_Roll.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Roll.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Gamma</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Gamma</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,:]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,:]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Attitude_Roll.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Roll.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;Gamma&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;O_BR&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BR&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                        <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Gamma&#39;</span><span class="p">]</span>
+</div>
+<div class="viewcode-block" id="Attitude_Roll.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Roll.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;O_BR&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;Gamma&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Gamma&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dO_dg</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                        <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BR&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span>
+
+</div></div>
+<div class="viewcode-block" id="Attitude_RotationMtx"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtx">[docs]</a><span class="k">class</span> <span class="nc">Attitude_RotationMtx</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot; Multiplies transformations to produce the orientation matrix of the</span>
+<span class="sd">    body frame with respect to inertial.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Attitude_RotationMtx</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_BR&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from body-fixed frame to rolled body-fixed frame over time&quot;</span>
+                               <span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_RI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from rolled body-fixed frame to Earth-centered inertial frame over time&quot;</span>
+                               <span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from body-fixed frame to Earth-centered inertial frame over time&quot;</span>
+                               <span class="p">))</span>
+
+<div class="viewcode-block" id="Attitude_RotationMtx.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtx.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;O_BR&#39;</span><span class="p">,</span> <span class="s">&#39;O_RI&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;O_BI&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Attitude_RotationMtx.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtx.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="c"># Calculation is fairly simple, so not cached.</span>
+        <span class="k">return</span>
+</div>
+<div class="viewcode-block" id="Attitude_RotationMtx.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtx.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[:,:,</span> <span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_RI</span><span class="p">[:,:,</span> <span class="n">i</span><span class="p">])</span>
+</div>
+<div class="viewcode-block" id="Attitude_RotationMtx.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtx.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="s">&#39;O_RI&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="n">u</span><span class="p">,</span> <span class="n">k</span><span class="p">,:]</span> <span class="o">*</span> \
+                                <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_RI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span>
+                        <span class="k">if</span> <span class="s">&#39;O_BR&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BR&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span> <span class="n">k</span><span class="p">,:]</span> <span class="o">*</span> \
+                                <span class="bp">self</span><span class="o">.</span><span class="n">O_RI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span>
+</div>
+<div class="viewcode-block" id="Attitude_RotationMtx.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtx.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="s">&#39;O_RI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_RI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BR</span><span class="p">[</span><span class="n">u</span><span class="p">,</span> <span class="n">k</span><span class="p">,:]</span> <span class="o">*</span> \
+                                <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span>
+                        <span class="k">if</span> <span class="s">&#39;O_BR&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BR&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,:]</span> <span class="o">*</span> \
+                                <span class="bp">self</span><span class="o">.</span><span class="n">O_RI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span>
+
+</div></div>
+<div class="viewcode-block" id="Attitude_RotationMtxRates"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtxRates">[docs]</a><span class="k">class</span> <span class="nc">Attitude_RotationMtxRates</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot; Calculates time derivative of body frame orientation matrix.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Attitude_RotationMtxRates</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;h&#39;</span><span class="p">,</span> <span class="n">Float</span><span class="p">(</span><span class="mf">28.8</span><span class="p">,</span>
+                            <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                            <span class="n">units</span><span class="o">=</span><span class="s">&quot;s&quot;</span><span class="p">,</span>
+                            <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Time step for RK4 integration&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from body-fixed frame to Earth-centered inertial frame over time&quot;</span><span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                                  <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;First derivative of O_BI over time&quot;</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="Attitude_RotationMtxRates.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtxRates.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;h&#39;</span><span class="p">,</span> <span class="s">&#39;O_BI&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Attitude_RotationMtxRates.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtxRates.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="c"># Calculation is fairly simple, so not cached.</span>
+        <span class="k">return</span>
+</div>
+<div class="viewcode-block" id="Attitude_RotationMtxRates.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtxRates.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Odot_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+</div>
+<div class="viewcode-block" id="Attitude_RotationMtxRates.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtxRates.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;Odot_BI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">/</span> \
+                        <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> \
+                        <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">/</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+</div>
+<div class="viewcode-block" id="Attitude_RotationMtxRates.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_RotationMtxRates.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;Odot_BI&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">2</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> \
+                        <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> \
+                        <span class="mf">2.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">-=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;Odot_BI&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> \
+                        <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+
+</div></div>
+<div class="viewcode-block" id="Attitude_Sideslip"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Sideslip">[docs]</a><span class="k">class</span> <span class="nc">Attitude_Sideslip</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot; Determine velocity in the body frame.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Attitude_Sideslip</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                                  <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position and velocity vector from earth to satellite in Earth-centered inertial frame over time&quot;</span>
+                                  <span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                               <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from body-fixed frame to Earth-centered inertial frame over time&quot;</span><span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;v_e2b_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                                  <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;m/s&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Velocity vector from earth to satellite in body-fixed frame over time&quot;</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="Attitude_Sideslip.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Sideslip.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,</span> <span class="s">&#39;O_BI&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;v_e2b_B&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Attitude_Sideslip.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Sideslip.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">J1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2</span> <span class="o">=</span> <span class="n">computepositionrotdjacobian</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span>
+                                                       <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="p">:],</span>
+                                                       <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Attitude_Sideslip.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Sideslip.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">v_e2b_B</span> <span class="o">=</span> <span class="n">computepositionrotd</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="p">:],</span>
+                                           <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Attitude_Sideslip.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Sideslip.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;v_e2b_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;v_e2b_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J1</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">*</span> \
+                                <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span>
+                <span class="k">if</span> <span class="s">&#39;r_e2b_I&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;v_e2b_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                            <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">][</span><span class="mi">3</span><span class="o">+</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span>
+</div>
+<div class="viewcode-block" id="Attitude_Sideslip.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Sideslip.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;v_e2b_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J1</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">]</span> <span class="o">*</span> \
+                                <span class="n">arg</span><span class="p">[</span><span class="s">&#39;v_e2b_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span>
+                <span class="k">if</span> <span class="s">&#39;r_e2b_I&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">][</span><span class="mi">3</span><span class="o">+</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                            <span class="n">arg</span><span class="p">[</span><span class="s">&#39;v_e2b_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span>
+
+</div></div>
+<div class="viewcode-block" id="Attitude_Torque"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Torque">[docs]</a><span class="k">class</span> <span class="nc">Attitude_Torque</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&quot;&quot;&quot; Compute the required reaction wheel tourque.&quot;&quot;&quot;</span>
+
+    <span class="n">J</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+    <span class="n">J</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.018</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+    <span class="n">J</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.018</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+    <span class="n">J</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.006</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Attitude_Torque</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                              <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                              <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Angular velocity in body-fixed frame over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;wdot_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                                 <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">,</span>
+                                 <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                                 <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s**2&quot;</span><span class="p">,</span>
+                                 <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Time derivative of w_B over time&quot;</span><span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;T_tot&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                                <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                                <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                                <span class="n">units</span><span class="o">=</span><span class="s">&quot;N*m&quot;</span><span class="p">,</span>
+                                <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Total reaction wheel torque over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dT_dwdot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Attitude_Torque.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Torque.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="s">&#39;wdot_B&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;T_tot&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Attitude_Torque.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Torque.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dT_dw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="n">wx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">wx</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">])</span>
+            <span class="n">wx</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">])</span>
+            <span class="n">wx</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="mf">0.</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">dT_dwdot</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dT_dw</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">wx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dT_dw</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dwx_dw</span><span class="p">[:,:,</span> <span class="n">k</span><span class="p">],</span>
+                                             <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]))</span>
+</div>
+<div class="viewcode-block" id="Attitude_Torque.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Torque.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="n">wx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">wx</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">])</span>
+            <span class="n">wx</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">])</span>
+            <span class="n">wx</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">],</span> <span class="mf">0.</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">T_tot</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">wdot_B</span><span class="p">[:,</span> <span class="n">i</span><span class="p">])</span> <span class="o">+</span> \
+                <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">wx</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]))</span>
+</div>
+<div class="viewcode-block" id="Attitude_Torque.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Torque.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;T_tot&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="s">&#39;w_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_tot&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dw</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                            <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="k">if</span> <span class="s">&#39;wdot_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_tot&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dwdot</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                            <span class="n">arg</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span>
+</div>
+<div class="viewcode-block" id="Attitude_Torque.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.attitude.Attitude_Torque.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;T_tot&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="s">&#39;w_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dw</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                            <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_tot&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="k">if</span> <span class="s">&#39;wdot_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;wdot_B&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dwdot</span><span class="p">[:,</span> <span class="n">k</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> \
+                            <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_tot&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

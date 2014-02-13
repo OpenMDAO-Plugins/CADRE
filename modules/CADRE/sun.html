@@ -1,0 +1,504 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.sun &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.sun</h1><div class="highlight"><pre>
+<span class="sd">&#39;&#39;&#39; Sun discipline for CADRE &#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">scipy.sparse</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Component</span>
+<span class="kn">from</span> <span class="nn">openmdao.lib.datatypes.api</span> <span class="kn">import</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Array</span>
+
+<span class="kn">from</span> <span class="nn">kinematics</span> <span class="kn">import</span> <span class="n">computepositionrotd</span><span class="p">,</span> <span class="n">computepositionrotdjacobian</span>
+<span class="kn">from</span> <span class="nn">kinematics</span> <span class="kn">import</span> <span class="n">computepositionspherical</span><span class="p">,</span> <span class="n">computepositionsphericaljacobian</span>
+
+<div class="viewcode-block" id="Sun_LOS"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_LOS">[docs]</a><span class="k">class</span> <span class="nc">Sun_LOS</span><span class="p">(</span> <span class="n">Component</span> <span class="p">):</span>
+
+    <span class="sd">&#39;&#39;&#39;Compute the Satellite to sun line of sight.&#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Sun_LOS</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">r1</span> <span class="o">=</span> <span class="mf">6378.137</span><span class="o">*</span><span class="mf">0.85</span> <span class="c"># Earth&#39;s radius is 6378 km. 0.85 is the alpha in John Hwang&#39;s paper</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">r2</span> <span class="o">=</span> <span class="mf">6378.137</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span>
+                                  <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                  <span class="n">units</span> <span class="o">=</span> <span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position and velocity vectors from &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;Earth to satellite in Earth-centered &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;inertial frame over time.&quot;</span><span class="p">,</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span>
+                                  <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;km&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position vector from &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;Earth to sun in Earth-centered inertial &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;frame over time.&quot;</span><span class="p">,</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;LOS&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span>
+                              <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Satellite to sun &quot;</span> <span class="o">+</span>
+                              <span class="s">&quot;line of sight over time&quot;</span><span class="p">,</span>
+                              <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span>
+                              <span class="p">))</span>
+
+<div class="viewcode-block" id="Sun_LOS.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_LOS.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,</span> <span class="s">&#39;r_e2s_I&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;LOS&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Sun_LOS.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_LOS.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="p">):</span>
+            <span class="n">r_b</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">r_s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_I</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">dot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span> <span class="n">r_b</span><span class="p">,</span> <span class="n">r_s</span> <span class="p">)</span>
+            <span class="n">cross</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span> <span class="n">r_b</span><span class="p">,</span> <span class="n">r_s</span> <span class="p">)</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span> <span class="n">cross</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">cross</span><span class="p">)</span> <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">dot</span> <span class="o">&gt;=</span> <span class="mf">0.0</span> <span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">LOS</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+            <span class="k">elif</span> <span class="n">dist</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r1</span> <span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">LOS</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="k">elif</span> <span class="n">dist</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r2</span> <span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">LOS</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+            <span class="k">else</span> <span class="p">:</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="p">(</span> <span class="n">dist</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">r1</span> <span class="p">)</span> <span class="o">/</span> <span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">r2</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">r1</span> <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">LOS</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span> <span class="o">*</span><span class="n">x</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">x</span><span class="o">**</span><span class="mi">3</span>
+</div>
+<div class="viewcode-block" id="Sun_LOS.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_LOS.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="n">nj</span> <span class="o">=</span> <span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+
+        <span class="n">Jab</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">)</span>
+        <span class="n">Jib</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">Jjb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">Jas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">)</span>
+        <span class="n">Jis</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">Jjs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+
+        <span class="n">r_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">r_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">Bx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">Sx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">cross</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="c">#ddist_cross = np.zeros(shape=(3,), dtype = np.int)</span>
+        <span class="n">dcross_drb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">dcross_drs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">dLOS_dx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">dLOS_drs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">dLOS_drb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">r_b</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">r_s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_I</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">Bx</span> <span class="o">=</span> <span class="n">crossMatrix</span><span class="p">(</span><span class="n">r_b</span><span class="p">)</span>
+            <span class="n">Sx</span> <span class="o">=</span> <span class="n">crossMatrix</span><span class="p">(</span><span class="o">-</span><span class="n">r_s</span><span class="p">)</span>
+            <span class="n">dot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r_b</span><span class="p">,</span><span class="n">r_s</span><span class="p">)</span>
+            <span class="n">cross</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">r_b</span><span class="p">,</span><span class="n">r_s</span><span class="p">)</span>
+            <span class="n">dist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">cross</span><span class="p">,</span><span class="n">cross</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="n">dot</span> <span class="o">&gt;=</span> <span class="mf">0.0</span> <span class="p">:</span>
+                <span class="n">dLOS_drb</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+                <span class="n">dLOS_drs</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="k">elif</span> <span class="n">dist</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r1</span> <span class="p">:</span>
+                <span class="n">dLOS_drb</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+                <span class="n">dLOS_drs</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="k">elif</span> <span class="n">dist</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r2</span> <span class="p">:</span>
+                <span class="n">dLOS_drb</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+                <span class="n">dLOS_drs</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">dist</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">r1</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">r2</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">r1</span><span class="p">)</span>
+                <span class="c">#LOS = 3*x**2 - 2*x**3</span>
+                <span class="n">ddist_dcross</span> <span class="o">=</span> <span class="n">cross</span><span class="o">/</span><span class="n">dist</span>
+                <span class="n">dcross_drb</span> <span class="o">=</span> <span class="n">Sx</span>
+                <span class="n">dcross_drs</span> <span class="o">=</span> <span class="n">Bx</span>
+                <span class="n">dx_ddist</span> <span class="o">=</span> <span class="mf">1.0</span><span class="o">/</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">r2</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">r1</span><span class="p">)</span>
+                <span class="n">dLOS_dx</span> <span class="o">=</span> <span class="mi">6</span><span class="o">*</span><span class="n">x</span> <span class="o">-</span> <span class="mi">6</span><span class="o">*</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span>
+                <span class="n">dLOS_drb</span> <span class="o">=</span> <span class="n">dLOS_dx</span><span class="o">*</span><span class="n">dx_ddist</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">ddist_dcross</span><span class="p">,</span><span class="n">dcross_drb</span><span class="p">)</span>
+                <span class="n">dLOS_drs</span> <span class="o">=</span> <span class="n">dLOS_dx</span><span class="o">*</span><span class="n">dx_ddist</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">ddist_dcross</span><span class="p">,</span><span class="n">dcross_drs</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="p">:</span>
+                <span class="n">iJ</span> <span class="o">=</span> <span class="n">i</span><span class="o">*</span><span class="mi">3</span> <span class="o">+</span> <span class="n">k</span>
+                <span class="n">Jab</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="n">dLOS_drb</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                <span class="n">Jib</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+                <span class="n">Jjb</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">*</span><span class="mi">6</span> <span class="o">+</span> <span class="n">k</span>
+                <span class="n">Jas</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="n">dLOS_drs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                <span class="n">Jis</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+                <span class="n">Jjs</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">*</span><span class="mi">3</span> <span class="o">+</span> <span class="n">k</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">Jb</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csc_matrix</span><span class="p">((</span><span class="n">Jab</span><span class="p">,(</span><span class="n">Jib</span><span class="p">,</span><span class="n">Jjb</span><span class="p">)),</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span><span class="mi">6</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Js</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csc_matrix</span><span class="p">((</span><span class="n">Jas</span><span class="p">,(</span><span class="n">Jis</span><span class="p">,</span><span class="n">Jjs</span><span class="p">)),</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">JbT</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jb</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">JsT</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Js</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="Sun_LOS.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_LOS.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2b_I&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">r_e2b_I</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">][:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">6</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span><span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;LOS&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jb</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r_e2b_I</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2s_I&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">r_e2s_I</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">][:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span><span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;LOS&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Js</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r_e2s_I</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Sun_LOS.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_LOS.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;LOS&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">LOS</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;LOS&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="s">&#39;r_e2b_I&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">JbT</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">LOS</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span><span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s">&#39;r_e2s_I&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">JsT</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">LOS</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span><span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+</div></div>
+<div class="viewcode-block" id="crossMatrix"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.crossMatrix">[docs]</a><span class="k">def</span> <span class="nf">crossMatrix</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+
+        <span class="c"># so m[1,0] is v[2], for example</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span> <span class="p">[</span>
+                         <span class="p">[</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="p">],</span>
+                         <span class="p">[</span> <span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>  <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+                         <span class="p">[</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mf">0.0</span> <span class="p">]</span>
+                       <span class="p">]</span> <span class="p">)</span>
+        <span class="k">return</span> <span class="n">m</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionBody"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionBody">[docs]</a><span class="k">class</span> <span class="nc">Sun_PositionBody</span><span class="p">(</span> <span class="n">Component</span> <span class="p">):</span>
+
+    <span class="sd">&#39;&#39;&#39;Position vector from earth to sun in body-fixed frame&#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Sun_PositionBody</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span>
+                               <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Rotation matrix from the &quot;</span> <span class="o">+</span>
+                               <span class="s">&quot;Earth-centered inertial frame &quot;</span> <span class="o">+</span>
+                               <span class="s">&quot;to the satellite frame.&quot;</span><span class="p">,</span>
+                               <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span>
+                                  <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;km&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position vector &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;from Earth to Sun in Earth-centered &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;inertial frame over time.&quot;</span><span class="p">,</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span>
+                                  <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span>
+                                  <span class="n">units</span> <span class="o">=</span> <span class="s">&quot;km&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position vector &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;from Earth to Sun in body-fixed &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;frame over time.&quot;</span> <span class="p">))</span>
+
+<div class="viewcode-block" id="Sun_PositionBody.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionBody.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;O_BI&#39;</span><span class="p">,</span> <span class="s">&#39;r_e2s_I&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionBody.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionBody.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_B</span> <span class="o">=</span> <span class="n">computepositionrotd</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_I</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionBody.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionBody.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">J1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2</span> <span class="o">=</span> <span class="n">computepositionrotdjacobian</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_I</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">O_BI</span> <span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionBody.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionBody.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J1</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">,:]</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2s_I&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionBody.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionBody.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2s_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+
+                <span class="k">if</span> <span class="s">&#39;O_BI&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                            <span class="n">result</span><span class="p">[</span><span class="s">&#39;O_BI&#39;</span><span class="p">][</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J1</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">u</span><span class="p">,</span><span class="n">v</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+                <span class="k">if</span> <span class="s">&#39;r_e2s_I&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+
+</div></div>
+<div class="viewcode-block" id="Sun_PositionECI"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionECI">[docs]</a><span class="k">class</span> <span class="nc">Sun_PositionECI</span><span class="p">(</span> <span class="n">Component</span> <span class="p">):</span>
+
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Compute the position vector from Earth to Sun in</span>
+<span class="sd">    Earth-centered inertial frame.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="c">#constants</span>
+    <span class="n">d2r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mf">180.</span>
+    <span class="n">LD</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Sun_PositionECI</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c">#self.add(&#39;LD&#39;, Array(np.zeros((1,), order=&#39;F&#39;), size=(1,), dtype=np.float, iotype=&quot;in&quot;))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+		    <span class="s">&#39;t&#39;</span><span class="p">,</span>
+		    <span class="n">Array</span><span class="p">(</span>
+		        <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span>
+			<span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span>
+			<span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                        <span class="n">units</span><span class="o">=</span><span class="s">&quot;s&quot;</span><span class="p">,</span>
+			<span class="n">desc</span><span class="o">=</span><span class="s">&quot;Time&quot;</span><span class="p">,</span>
+			<span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span>
+		    <span class="p">)</span>
+	<span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">),</span>
+                                  <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span>
+                                  <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;km&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position vector from Earth &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;to Sun in Earth-centered inertial &quot;</span> <span class="o">+</span>
+                                  <span class="s">&quot;frame over time.&quot;</span><span class="p">,</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">Ja</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Ji</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Jj</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Sun_PositionECI.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionECI.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;LD&#39;</span><span class="p">,</span> <span class="s">&#39;t&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionECI.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionECI.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">LD</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[:]</span><span class="o">/</span><span class="mf">3600.</span><span class="o">/</span><span class="mf">24.</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">L</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">280.460</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.9856474</span><span class="o">*</span><span class="n">T</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">g</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">357.528</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.9856003</span><span class="o">*</span><span class="n">T</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">Lambda</span> <span class="o">=</span> <span class="n">L</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">1.914666</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">g</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.01999464</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">g</span><span class="p">)</span>
+            <span class="n">eps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">23.439</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">3.56e-7</span><span class="o">*</span><span class="n">T</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_I</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">Lambda</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_I</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">Lambda</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">eps</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_I</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">Lambda</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">eps</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionECI.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionECI.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">LD</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">t</span><span class="p">[:]</span><span class="o">/</span><span class="mf">3600.</span><span class="o">/</span><span class="mf">24.</span>
+        <span class="n">dr_dt</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">L</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">280.460</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.9856474</span><span class="o">*</span><span class="n">T</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">g</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">357.528</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.9856003</span><span class="o">*</span><span class="n">T</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">Lambda</span> <span class="o">=</span> <span class="n">L</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">1.914666</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">g</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.01999464</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">g</span><span class="p">)</span>
+            <span class="n">eps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">23.439</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">3.56e-7</span><span class="o">*</span><span class="n">T</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+            <span class="n">dL_dt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.9856474</span>
+            <span class="n">dg_dt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.9856003</span>
+            <span class="n">dlambda_dt</span> <span class="o">=</span> <span class="n">dL_dt</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">1.914666</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">g</span><span class="p">)</span><span class="o">*</span><span class="n">dg_dt</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">0.01999464</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">g</span><span class="p">)</span><span class="o">*</span><span class="mi">2</span><span class="o">*</span><span class="n">dg_dt</span>
+            <span class="n">deps_dt</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">d2r</span><span class="o">*</span><span class="mf">3.56e-7</span>
+
+            <span class="n">dr_dt</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">Lambda</span><span class="p">)</span><span class="o">*</span><span class="n">dlambda_dt</span>
+            <span class="n">dr_dt</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">Lambda</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">eps</span><span class="p">)</span><span class="o">*</span><span class="n">dlambda_dt</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">Lambda</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">eps</span><span class="p">)</span><span class="o">*</span><span class="n">deps_dt</span>
+            <span class="n">dr_dt</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">Lambda</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">eps</span><span class="p">)</span><span class="o">*</span><span class="n">dlambda_dt</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">Lambda</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">eps</span><span class="p">)</span><span class="o">*</span><span class="n">deps_dt</span>
+
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">3</span><span class="p">):</span>
+                <span class="c">#iJ = (i-1)*3 + k #This is the original implementation, but it may not work because of index differences between fortran and python</span>
+                <span class="c">#self.Ja[iJ] = dr_dt[k]</span>
+                <span class="c">#self.Ji[iJ] = iJ - 1</span>
+                <span class="c">#self.Jj[iJ] = i - 1</span>
+                <span class="n">iJ</span> <span class="o">=</span> <span class="n">i</span><span class="o">*</span><span class="mi">3</span> <span class="o">+</span> <span class="n">k</span> <span class="c">#This should resolve the index issues</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Ja</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="n">dr_dt</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Ji</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="n">iJ</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">Jj</span><span class="p">[</span><span class="n">iJ</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">J</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csc_matrix</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">Ja</span><span class="p">,(</span><span class="bp">self</span><span class="o">.</span><span class="n">Ji</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">Jj</span><span class="p">)),</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">JT</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionECI.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionECI.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;LD&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;t&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">][:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;LD&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;t&#39;</span><span class="p">]</span><span class="o">/</span><span class="mf">3600.</span><span class="o">/</span><span class="mf">24.</span> <span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span><span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionECI.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionECI.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2s_I&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">r_e2s_I</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2s_I&#39;</span><span class="p">][:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span><span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s">&#39;LD&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;LD&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">JT</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r_e2s_I</span><span class="p">))</span>
+            <span class="k">if</span> <span class="s">&#39;t&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;t&#39;</span><span class="p">][:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">JT</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r_e2s_I</span><span class="p">)</span><span class="o">/</span><span class="mf">3600.0</span><span class="o">/</span><span class="mf">24.0</span>
+
+</div></div>
+<div class="viewcode-block" id="Sun_PositionSpherical"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionSpherical">[docs]</a><span class="k">class</span> <span class="nc">Sun_PositionSpherical</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+
+    <span class="sd">&#39;&#39;&#39;Compute the elevation angle of the Sun in the body-fixed frame.&#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Sun_PositionSpherical</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                                  <span class="n">units</span> <span class="o">=</span> <span class="s">&quot;km&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position vector from &quot;</span> <span class="o">+</span>
+                                      <span class="s">&quot;Earth to Sun in body-fixed &quot;</span> <span class="o">+</span>
+                                      <span class="s">&quot;frame over time.&quot;</span><span class="p">,</span>
+                                  <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;azimuth&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&#39;rad&#39;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&#39;Ezimuth angle of the Sun &#39;</span> <span class="o">+</span>
+                                      <span class="s">&#39;in the body-fixed frame over time.&#39;</span><span class="p">,</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;elevation&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                    <span class="n">units</span><span class="o">=</span><span class="s">&#39;rad&#39;</span><span class="p">,</span>
+                                    <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Elevation angle of the &quot;</span> <span class="o">+</span>
+                                        <span class="s">&quot;Sun in the body-fixed frame &quot;</span> <span class="o">+</span>
+                                        <span class="s">&quot;over time.&quot;</span><span class="p">,</span>
+                                    <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Sun_PositionSpherical.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionSpherical.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;azimuth&#39;</span><span class="p">,</span> <span class="s">&#39;elevation&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionSpherical.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionSpherical.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">azimuth</span><span class="p">,</span> <span class="n">elevation</span> <span class="o">=</span> <span class="n">computepositionspherical</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_B</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">azimuth</span> <span class="o">=</span> <span class="n">azimuth</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">elevation</span> <span class="o">=</span> <span class="n">elevation</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionSpherical.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionSpherical.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Ja1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Ji1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jj1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Ja2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Ji2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jj2</span> <span class="o">=</span> \
+                  <span class="n">computepositionsphericaljacobian</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">r_e2s_B</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">J1</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csc_matrix</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">Ja1</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Ji1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jj1</span><span class="p">)),</span>
+                                          <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">J2</span> <span class="o">=</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csc_matrix</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">Ja2</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Ji2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jj2</span><span class="p">)),</span>
+                                          <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">J1T</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J1</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">J2T</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+
+        <span class="k">return</span>
+</div>
+<div class="viewcode-block" id="Sun_PositionSpherical.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionSpherical.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2s_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">r_e2s_B</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;azimuth&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J1</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r_e2s_B</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;elevation&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">r_e2s_B</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="Sun_PositionSpherical.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.sun.Sun_PositionSpherical.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;azimuth&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;r_e2s_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">azimuth</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;azimuth&#39;</span><span class="p">][:]</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">][:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J1T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">azimuth</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s">&#39;elevation&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;r_e2s_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">elevation</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;elevation&#39;</span><span class="p">][:]</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2s_B&#39;</span><span class="p">][:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J2T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">elevation</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="s">&#39;F&#39;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

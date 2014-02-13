@@ -1,0 +1,202 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Overview of CADRE &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="index.html" />
+    <link rel="next" title="Example: Optimization of the CADRE Orbital Parameters" href="launch.html" />
+    <link rel="prev" title="CADRE Documentation" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="launch.html" title="Example: Optimization of the CADRE Orbital Parameters"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="CADRE Documentation"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">CADRE 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="overview-of-cadre">
+<h1>Overview of CADRE<a class="headerlink" href="#overview-of-cadre" title="Permalink to this headline">¶</a></h1>
+<p><a class="reference external" href="http://exploration.engin.umich.edu/blog/?page_id=961">CADRE</a> (Cubesat investigating Atmospheric Density Response to Extreme driving)
+is a mission funded by the National Science Foundation to study the
+response of the <a class="reference internal" href="glossary.html#term-thermosphere"><em class="xref std std-term">thermosphere</em></a> to auroral energy inputs.</p>
+<a class="reference internal image-reference" href="_images/cadre3.jpg"><img alt="_images/cadre3.jpg" class="align-center" src="_images/cadre3.jpg" style="width: 750px;" /></a>
+<p>A graph-free gradient-based approach at multidisciplinary optimization of the CADRE system and mission has
+previously been used successfully by <a class="reference external" href="http://mdolab.engin.umich.edu/content/large-scale-mdo-small-satellite-using-novel-framework-solution-coupled-systems-and-their">Hwang et al</a>.
+We have implemented the same problem formulation using OpenMDAO. The CADRE problem represents a class of problems
+with medium complexity and medium fidelity and is remarkably scalable.</p>
+<p>The CADRE problem models the interaction of several disciplines (attitude control, communications, power and energy
+storage system, thermal dynamics, craft orbital dynamics, and sun-earth position) over the course of the mission.
+Specifically, the system is modeled over the course of six separate half-days of operation, computed at conditions
+1, 3, 5, 7, 9, and 11 months after launch. This way, design parameters can be optimized to balance performance under
+diverse conditions (such as relative location of the sun, etc.) over the course of the mission. The objective of the
+optimization is to maximize the total amount of data transmitted to the ground station (Ann Arbor, MI) over the six
+design points.</p>
+<p>This figure shows the interaction among the separate components of the CADRE optimization MDPproblem:</p>
+<div class="figure align-center">
+<a class="reference internal image-reference" href="_images/design.png"><img alt="_images/design.png" src="_images/design.png" style="width: 1100px;" /></a>
+</div>
+<p>Seven types of design parameters are involved. Four of these design parameters vary over time: current of each solar
+cell (&#8216;Isetpt&#8217;); the craft roll angle (&#8216;Gamma&#8217;); communications system power (&#8216;P_comm&#8217;); and battery initial state of
+charge (&#8216;iSOC&#8217;).</p>
+<p>The remaining three design variables are static: the choice of whether solar panel or radiator is installed in a
+particular location on the craft (&#8216;Cellinstd&#8217;); the angle of the four fins (&#8216;finAngle&#8217;); and the angle of the
+communications antenna (&#8216;antAngle&#8217;).</p>
+<p>The CADRE model is parameterized by the number of discrete time steps desired (&#8216;n&#8217;) as well as a number of B-spline
+control points (&#8216;m&#8217;) used to interpolate the design variables to arrays of size &#8216;n&#8217; (in the array dimension
+representing time). So &#8216;m&#8217; has direct influence on the number of the time-varying design variables in the problem,
+while &#8216;n&#8217; controls the fidelity of the results.</p>
+<p>Five constraints for the problem relate to the battery charge rate, battery discharge rate, minimum
+battery capacity, maximum battery capacity, and a battery state-of-charge periodicity constraint.</p>
+<p>Very thorough descriptions of the engineering modeled by each discipline in the CADRE model (as well as the Multiple Design
+Points [MDP] problem formulation) is given by <a class="reference external" href="http://mdolab.engin.umich.edu/content/large-scale-mdo-small-satellite-using-novel-framework-solution-coupled-systems-and-their">Hwang et al</a>
+in their original paper.</p>
+<p>The default values for &#8216;n&#8217; and &#8216;m&#8217; are 1500 and 300 respectively, which gives a full design problem with <strong>over
+25,000 design variables</strong>. The graph structure of OpenMDAO&#8217;s derivatives system together with high-performance
+optimizers enable problems of this size to be solved efficiently.</p>
+</div>
+<div class="section" id="structure-of-the-cadre-plugin">
+<h1>Structure of the CADRE Plugin<a class="headerlink" href="#structure-of-the-cadre-plugin" title="Permalink to this headline">¶</a></h1>
+<p>The CADRE plugin has the following structure:</p>
+<p><strong>CADRE()</strong>: the OpenMDAO assembly containing all components that model the discipline for the CADRE satellite.
+Note that this assembly does not have an optimization driver by default, only a run-once driver.</p>
+<p>Example usage:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">CADRE</span> <span class="kn">import</span> <span class="n">CADRE</span>
+<span class="n">assembly</span> <span class="o">=</span> <span class="n">CADRE</span><span class="p">(</span><span class="mi">1500</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span> <span class="c"># set with n and m values</span>
+<span class="n">assembly</span><span class="o">.</span><span class="n">run</span><span class="p">()</span> <span class="c"># Evaluates the model at it&#39;s current values</span>
+</pre></div>
+</div>
+<p><strong>CADRE_Optimization()</strong>: the OpenMDAO assembly that specifies the six-point MDP CADRE optimization problem.
+Specifically, it contains six instances of the CADRE assembly, which are each set to model conditions at a fixed
+amount of time following launch. The default driver is SNOPT (via OpenMDAO&#8217;s <tt class="docutils literal"><span class="pre">pyopt_driver</span></tt>).</p>
+<p>Example usage:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">CADRE</span> <span class="kn">import</span> <span class="n">CADRE_Optimization</span>
+<span class="n">top</span> <span class="o">=</span> <span class="n">CADRE_Optimization</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">1500</span><span class="p">,</span> <span class="n">m</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span> <span class="c"># Set with n and m values</span>
+<span class="n">top</span><span class="o">.</span><span class="n">run</span><span class="p">()</span> <span class="c"># Optimizes the full CADRE model across all 6 design points</span>
+</pre></div>
+</div>
+<p>Within this assembly, the CADRE design point sub-assemblies are named <cite>pt0</cite>, <cite>pt1</cite>, <cite>pt2</cite>, <cite>pt3</cite>, <cite>pt4</cite>, and
+<cite>pt5</cite>. For example, to print (or assign) the initial state of charge (<cite>iSOC</cite>) at the first design point, you
+would write:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">print</span> <span class="n">top</span><span class="o">.</span><span class="n">pt0</span><span class="o">.</span><span class="n">iSOC</span>
+</pre></div>
+</div>
+<p>A more thorough example of running this assembly is given in the full problem tutorial.</p>
+<p>In addition to these two assemblies, all of the individual components of the CADRE model can be imported and used
+directly as well.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">CADRE</span> <span class="kn">import</span> <span class="n">Attitude_Roll</span><span class="p">,</span> <span class="n">Solar_ExposedArea</span>
+<span class="n">A</span> <span class="o">=</span> <span class="n">Attitude_Roll</span><span class="p">(</span><span class="mi">1500</span><span class="p">)</span> <span class="c"># Must initialize with an n value</span>
+<span class="n">S</span> <span class="o">=</span> <span class="n">Solar_ExposedArea</span><span class="p">(</span><span class="mi">1500</span><span class="p">,</span> <span class="n">raw1</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">raw2</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>As seen above, components which depend on raw data files (such as the <tt class="docutils literal"><span class="pre">Solar_ExposedArea</span></tt> component) can have
+the raw data passed directly as optional keyword arguments. If no value is set (or if the set value is None),
+then these components will default to loading the data from disc. All of the raw data files needed for the CADRE
+components are installed together with the plugin.</p>
+<p>The next two sections demonstrate how to import and use components of the full CADRE model to solve two smaller
+design problems.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Overview of CADRE</a></li>
+<li><a class="reference internal" href="#structure-of-the-cadre-plugin">Structure of the CADRE Plugin</a></li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">CADRE Documentation</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="launch.html"
+                        title="next chapter">Example: Optimization of the CADRE Orbital Parameters</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/overview.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="launch.html" title="Example: Optimization of the CADRE Orbital Parameters"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="CADRE Documentation"
+             >previous</a> |</li>
+        <li><a href="index.html">CADRE 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

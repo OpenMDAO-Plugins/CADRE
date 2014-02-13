@@ -1,0 +1,411 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.orbit &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.orbit</h1><div class="highlight"><pre>
+<span class="sd">&#39;&#39;&#39; Orbit discipline for CADRE &#39;&#39;&#39;</span>
+
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.lib.datatypes.api</span> <span class="kn">import</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Array</span>
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Component</span>
+
+<span class="kn">import</span> <span class="nn">rk4</span>
+
+<span class="c"># Allow non-standard variable names for scientific calc</span>
+<span class="c"># pylint: disable-msg=C0103</span>
+
+<span class="c"># Constants</span>
+<span class="n">mu</span> <span class="o">=</span> <span class="mf">398600.44</span>
+<span class="n">Re</span> <span class="o">=</span> <span class="mf">6378.137</span>
+<span class="n">J2</span> <span class="o">=</span> <span class="mf">1.08264e-3</span>
+<span class="n">J3</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.51e-6</span>
+<span class="n">J4</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.60e-6</span>
+
+<span class="n">C1</span> <span class="o">=</span> <span class="o">-</span><span class="n">mu</span>
+<span class="n">C2</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.5</span><span class="o">*</span><span class="n">mu</span><span class="o">*</span><span class="n">J2</span><span class="o">*</span><span class="n">Re</span><span class="o">**</span><span class="mi">2</span>
+<span class="n">C3</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.5</span><span class="o">*</span><span class="n">mu</span><span class="o">*</span><span class="n">J3</span><span class="o">*</span><span class="n">Re</span><span class="o">**</span><span class="mi">3</span>
+<span class="n">C4</span> <span class="o">=</span> <span class="mf">1.875</span><span class="o">*</span><span class="n">mu</span><span class="o">*</span><span class="n">J4</span><span class="o">*</span><span class="n">Re</span><span class="o">**</span><span class="mi">4</span>
+
+<div class="viewcode-block" id="Orbit_Dynamics"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Dynamics">[docs]</a><span class="k">class</span> <span class="nc">Orbit_Dynamics</span><span class="p">(</span><span class="n">rk4</span><span class="o">.</span><span class="n">RK4</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Computes the Earth to body position vector in Earth-centered intertial frame.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_times</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Orbit_Dynamics</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">,</span><span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,)),</span>
+                            <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,),</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                            <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                            <span class="n">fd_step</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span>
+                            <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                            <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Initial position and velocity vectors from earth to satellite in Earth-centered inertial frame&quot;</span><span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="mi">1000</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="n">n_times</span><span class="p">)),</span>
+                                  <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">n_times</span><span class="p">),</span>
+                                  <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                  <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span>
+                                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Position and velocity vectors from earth to satellite in Earth-centered inertial frame over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span> <span class="o">=</span> <span class="s">&#39;r_e2b_I&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span> <span class="o">=</span> <span class="s">&#39;r_e2b_I0&#39;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dfdx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Orbit_Dynamics.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Dynamics.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2b_I&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Orbit_Dynamics.f_dot"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Dynamics.f_dot">[docs]</a>    <span class="k">def</span> <span class="nf">f_dot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+
+        <span class="n">x</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mf">1e-15</span> <span class="k">else</span> <span class="mf">1e-5</span>
+
+        <span class="n">z2</span> <span class="o">=</span> <span class="n">z</span><span class="o">*</span><span class="n">z</span>
+        <span class="n">z3</span> <span class="o">=</span> <span class="n">z2</span><span class="o">*</span><span class="n">z</span>
+        <span class="n">z4</span> <span class="o">=</span> <span class="n">z3</span><span class="o">*</span><span class="n">z</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">y</span><span class="o">*</span><span class="n">y</span> <span class="o">+</span> <span class="n">z2</span><span class="p">)</span>
+
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">r</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r3</span> <span class="o">=</span> <span class="n">r2</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r4</span> <span class="o">=</span> <span class="n">r3</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r5</span> <span class="o">=</span> <span class="n">r4</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r7</span> <span class="o">=</span> <span class="n">r5</span><span class="o">*</span><span class="n">r</span><span class="o">*</span><span class="n">r</span>
+
+        <span class="n">T2</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">5</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r2</span>
+        <span class="n">T3</span> <span class="o">=</span> <span class="mi">3</span><span class="o">*</span><span class="n">z</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">z3</span><span class="o">/</span><span class="n">r2</span>
+        <span class="n">T4</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">14</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r2</span> <span class="o">+</span> <span class="mi">21</span><span class="o">*</span><span class="n">z4</span><span class="o">/</span><span class="n">r4</span>
+        <span class="n">T3z</span> <span class="o">=</span> <span class="mi">3</span><span class="o">*</span><span class="n">z</span> <span class="o">-</span> <span class="mf">0.6</span><span class="o">*</span><span class="n">r2</span><span class="o">/</span><span class="n">z</span>
+        <span class="n">T4z</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">-</span> <span class="mf">28.0</span><span class="o">/</span><span class="mf">3.0</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r2</span>
+
+        <span class="n">f_dot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,))</span>
+        <span class="n">f_dot</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span>
+        <span class="n">f_dot</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">C1</span><span class="o">/</span><span class="n">r3</span> <span class="o">+</span> <span class="n">C2</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="n">T2</span> <span class="o">+</span> <span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">T3</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">T4</span><span class="p">)</span>
+        <span class="n">f_dot</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="o">+=</span> <span class="n">z</span><span class="o">*</span><span class="p">(</span><span class="mf">2.0</span><span class="o">*</span><span class="n">C2</span><span class="o">/</span><span class="n">r5</span> <span class="o">+</span> <span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">T3z</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">T4z</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">f_dot</span>
+</div>
+<div class="viewcode-block" id="Orbit_Dynamics.df_dy"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Dynamics.df_dy">[docs]</a>    <span class="k">def</span> <span class="nf">df_dy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+
+        <span class="n">x</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mf">1e-15</span> <span class="k">else</span> <span class="mf">1e-5</span>
+
+        <span class="n">z2</span> <span class="o">=</span> <span class="n">z</span><span class="o">*</span><span class="n">z</span>
+        <span class="n">z3</span> <span class="o">=</span> <span class="n">z2</span><span class="o">*</span><span class="n">z</span>
+        <span class="n">z4</span> <span class="o">=</span> <span class="n">z3</span><span class="o">*</span><span class="n">z</span>
+
+        <span class="n">r</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">*</span><span class="n">x</span> <span class="o">+</span> <span class="n">y</span><span class="o">*</span><span class="n">y</span> <span class="o">+</span> <span class="n">z2</span><span class="p">)</span>
+
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">r</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r3</span> <span class="o">=</span> <span class="n">r2</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r4</span> <span class="o">=</span> <span class="n">r3</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r5</span> <span class="o">=</span> <span class="n">r4</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r6</span> <span class="o">=</span> <span class="n">r5</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r7</span> <span class="o">=</span> <span class="n">r6</span><span class="o">*</span><span class="n">r</span>
+        <span class="n">r8</span> <span class="o">=</span> <span class="n">r7</span><span class="o">*</span><span class="n">r</span>
+
+        <span class="n">drdx</span> <span class="o">=</span> <span class="n">x</span><span class="o">/</span><span class="n">r</span>
+        <span class="n">drdy</span> <span class="o">=</span> <span class="n">y</span><span class="o">/</span><span class="n">r</span>
+        <span class="n">drdz</span> <span class="o">=</span> <span class="n">z</span><span class="o">/</span><span class="n">r</span>
+
+        <span class="n">T2</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">5</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r2</span>
+        <span class="n">T3</span> <span class="o">=</span> <span class="mi">3</span><span class="o">*</span><span class="n">z</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">z3</span><span class="o">/</span><span class="n">r2</span>
+        <span class="n">T4</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">14</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r2</span> <span class="o">+</span> <span class="mi">21</span><span class="o">*</span><span class="n">z4</span><span class="o">/</span><span class="n">r4</span>
+        <span class="n">T3z</span> <span class="o">=</span> <span class="mi">3</span><span class="o">*</span><span class="n">z</span> <span class="o">-</span> <span class="mf">0.6</span><span class="o">*</span><span class="n">r2</span><span class="o">/</span><span class="n">z</span>
+        <span class="n">T4z</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">-</span> <span class="mf">28.0</span><span class="o">/</span><span class="mf">3.0</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r2</span>
+
+        <span class="n">dT2_dx</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="o">*</span><span class="n">z2</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">r3</span><span class="p">)</span><span class="o">*</span><span class="n">drdx</span>
+        <span class="n">dT2_dy</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="o">*</span><span class="n">z2</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">r3</span><span class="p">)</span><span class="o">*</span><span class="n">drdy</span>
+        <span class="n">dT2_dz</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="o">*</span><span class="n">z2</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">r3</span><span class="p">)</span><span class="o">*</span><span class="n">drdz</span> <span class="o">-</span> <span class="mf">10.</span><span class="o">*</span><span class="n">z</span><span class="o">/</span><span class="n">r2</span>
+
+        <span class="n">dT3_dx</span> <span class="o">=</span> <span class="mi">14</span><span class="o">*</span><span class="n">z3</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdx</span>
+        <span class="n">dT3_dy</span> <span class="o">=</span> <span class="mi">14</span><span class="o">*</span><span class="n">z3</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdy</span>
+        <span class="n">dT3_dz</span> <span class="o">=</span> <span class="mi">14</span><span class="o">*</span><span class="n">z3</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdz</span> <span class="o">-</span> <span class="mf">21.</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r2</span> <span class="o">+</span> <span class="mi">3</span>
+
+        <span class="n">dT4_dx</span> <span class="o">=</span> <span class="mi">28</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdx</span> <span class="o">-</span> <span class="mf">84.</span><span class="o">*</span><span class="n">z4</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="n">drdx</span>
+        <span class="n">dT4_dy</span> <span class="o">=</span> <span class="mi">28</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdy</span> <span class="o">-</span> <span class="mf">84.</span><span class="o">*</span><span class="n">z4</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="n">drdy</span>
+        <span class="n">dT4_dz</span> <span class="o">=</span> <span class="mi">28</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdz</span> <span class="o">-</span> <span class="mf">84.</span><span class="o">*</span><span class="n">z4</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="n">drdz</span> <span class="o">-</span> <span class="mi">28</span><span class="o">*</span><span class="n">z</span><span class="o">/</span><span class="n">r2</span> <span class="o">+</span> <span class="mi">84</span><span class="o">*</span><span class="n">z3</span><span class="o">/</span><span class="n">r4</span>
+
+        <span class="n">dT3z_dx</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.2</span><span class="o">*</span><span class="n">r</span><span class="o">/</span><span class="n">z</span><span class="o">*</span><span class="n">drdx</span>
+        <span class="n">dT3z_dy</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.2</span><span class="o">*</span><span class="n">r</span><span class="o">/</span><span class="n">z</span><span class="o">*</span><span class="n">drdy</span>
+        <span class="n">dT3z_dz</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.2</span><span class="o">*</span><span class="n">r</span><span class="o">/</span><span class="n">z</span><span class="o">*</span><span class="n">drdz</span> <span class="o">+</span> <span class="mf">0.6</span><span class="o">*</span><span class="n">r2</span><span class="o">/</span><span class="n">z2</span> <span class="o">+</span> <span class="mi">3</span>
+
+        <span class="n">dT4z_dx</span> <span class="o">=</span> <span class="mf">56.0</span><span class="o">/</span><span class="mf">3.0</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdx</span>
+        <span class="n">dT4z_dy</span> <span class="o">=</span> <span class="mf">56.0</span><span class="o">/</span><span class="mf">3.0</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdy</span>
+        <span class="n">dT4z_dz</span> <span class="o">=</span> <span class="mf">56.0</span><span class="o">/</span><span class="mf">3.0</span><span class="o">*</span><span class="n">z2</span><span class="o">/</span><span class="n">r3</span><span class="o">*</span><span class="n">drdz</span> <span class="o">-</span> <span class="mf">56.0</span><span class="o">/</span><span class="mf">3.0</span><span class="o">*</span><span class="n">z</span><span class="o">/</span><span class="n">r2</span>
+
+        <span class="n">eye</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">identity</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+
+        <span class="n">dfdy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">eye</span>
+
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">+</span> <span class="n">eye</span><span class="o">*</span><span class="p">(</span><span class="n">C1</span><span class="o">/</span><span class="n">r3</span> <span class="o">+</span> <span class="n">C2</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="n">T2</span> <span class="o">+</span> <span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">T3</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">T4</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">drdx</span><span class="o">*</span><span class="n">state</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="o">*</span><span class="n">C1</span><span class="o">/</span><span class="n">r4</span> <span class="o">-</span> <span class="mi">5</span><span class="o">*</span><span class="n">C2</span><span class="o">/</span><span class="n">r6</span><span class="o">*</span><span class="n">T2</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C3</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T3</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C4</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T4</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">drdy</span><span class="o">*</span><span class="n">state</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="o">*</span><span class="n">C1</span><span class="o">/</span><span class="n">r4</span> <span class="o">-</span> <span class="mi">5</span><span class="o">*</span><span class="n">C2</span><span class="o">/</span><span class="n">r6</span><span class="o">*</span><span class="n">T2</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C3</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T3</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C4</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T4</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">drdz</span><span class="o">*</span><span class="n">state</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="o">*</span><span class="n">C1</span><span class="o">/</span><span class="n">r4</span> <span class="o">-</span> <span class="mi">5</span><span class="o">*</span><span class="n">C2</span><span class="o">/</span><span class="n">r6</span><span class="o">*</span><span class="n">T2</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C3</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T3</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C4</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T4</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">state</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">C2</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="n">dT2_dx</span> <span class="o">+</span> <span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT3_dx</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT4_dx</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">state</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">C2</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="n">dT2_dy</span> <span class="o">+</span> <span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT3_dy</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT4_dy</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">state</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">C2</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="n">dT2_dz</span> <span class="o">+</span> <span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT3_dz</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT4_dz</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">drdx</span><span class="o">*</span><span class="n">z</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="mi">5</span><span class="o">*</span><span class="n">C2</span><span class="o">/</span><span class="n">r6</span><span class="o">*</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C3</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T3z</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C4</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T4z</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">drdy</span><span class="o">*</span><span class="n">z</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="mi">5</span><span class="o">*</span><span class="n">C2</span><span class="o">/</span><span class="n">r6</span><span class="o">*</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C3</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T3z</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C4</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T4z</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">drdz</span><span class="o">*</span><span class="n">z</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="mi">5</span><span class="o">*</span><span class="n">C2</span><span class="o">/</span><span class="n">r6</span><span class="o">*</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C3</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T3z</span> <span class="o">-</span> <span class="mi">7</span><span class="o">*</span><span class="n">C4</span><span class="o">/</span><span class="n">r8</span><span class="o">*</span><span class="n">T4z</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">z</span><span class="o">*</span><span class="p">(</span><span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT3z_dx</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT4z_dx</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">z</span><span class="o">*</span><span class="p">(</span><span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT3z_dy</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT4z_dy</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">z</span><span class="o">*</span><span class="p">(</span><span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT3z_dz</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">dT4z_dz</span><span class="p">)</span>
+        <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">dfdy</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">C2</span><span class="o">/</span><span class="n">r5</span><span class="o">*</span><span class="mi">2</span> <span class="o">+</span> <span class="n">C3</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">T3z</span> <span class="o">+</span> <span class="n">C4</span><span class="o">/</span><span class="n">r7</span><span class="o">*</span><span class="n">T4z</span><span class="p">)</span>
+        <span class="c">#dfdy[5, 2] = dfdy[5, 2] + (2.0*C2 + (C3*T3z + C4*T4z)/r2)/r5</span>
+
+        <span class="c">#print dfdy</span>
+        <span class="k">return</span> <span class="n">dfdy</span>
+</div>
+<div class="viewcode-block" id="Orbit_Dynamics.df_dx"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Dynamics.df_dx">[docs]</a>    <span class="k">def</span> <span class="nf">df_dx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dfdx</span>
+
+</div></div>
+<div class="viewcode-block" id="Orbit_Initial"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Initial">[docs]</a><span class="k">class</span> <span class="nc">Orbit_Initial</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Computes initial position and velocity vectors of Earth to body position&quot;&quot;&quot;</span>
+
+    <span class="c"># Inputs</span>
+    <span class="n">altPerigee</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">500.</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+    <span class="n">altApogee</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">500.</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+    <span class="n">RAAN</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">66.279</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+    <span class="n">Inc</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">82.072</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+    <span class="n">argPerigee</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+    <span class="n">trueAnomaly</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">337.987</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="bp">None</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">Orbit_Initial</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="c">#Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">6</span><span class="p">,)),</span>
+                                   <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">6</span><span class="p">,),</span>
+                                   <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                   <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">,</span>
+                                   <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                                   <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Initial position and velocity vectors from Earth to satellite in Earth-centered inertial frame&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Orbit_Initial.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Initial.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;altPerigee&#39;</span><span class="p">,</span><span class="s">&#39;altApogee&#39;</span><span class="p">,</span><span class="s">&#39;RAAN&#39;</span><span class="p">,</span><span class="s">&#39;Inc&#39;</span><span class="p">,</span><span class="s">&#39;argPerigee&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;trueAnomaly&#39;</span><span class="p">)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="Orbit_Initial.compute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Initial.compute">[docs]</a>    <span class="k">def</span> <span class="nf">compute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">altPerigee</span><span class="p">,</span> <span class="n">altApogee</span><span class="p">,</span> <span class="n">RAAN</span><span class="p">,</span> <span class="n">Inc</span><span class="p">,</span> <span class="n">argPerigee</span><span class="p">,</span> <span class="n">trueAnomaly</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Compute position and velocity from orbital elements &#39;&#39;&#39;</span>
+
+        <span class="n">Re</span> <span class="o">=</span> <span class="mf">6378.137</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="mf">398600.44</span>
+
+        <span class="k">def</span> <span class="nf">S</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+            <span class="n">S</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">),</span><span class="nb">complex</span><span class="p">)</span>
+            <span class="n">S</span><span class="p">[</span><span class="mi">0</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+            <span class="n">S</span><span class="p">[</span><span class="mi">1</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">S</span><span class="p">[</span><span class="mi">2</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">S</span>
+
+        <span class="k">def</span> <span class="nf">getRotation</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">angle</span><span class="p">):</span>
+            <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span> <span class="o">+</span> <span class="n">S</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">angle</span><span class="p">)</span> <span class="o">+</span> \
+                <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">angle</span><span class="p">))</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">axis</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">R</span>
+
+        <span class="n">d2r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mf">180.0</span>
+        <span class="n">r_perigee</span> <span class="o">=</span> <span class="n">Re</span> <span class="o">+</span> <span class="n">altPerigee</span>
+        <span class="n">r_apogee</span> <span class="o">=</span> <span class="n">Re</span> <span class="o">+</span> <span class="n">altApogee</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="p">(</span><span class="n">r_apogee</span><span class="o">-</span><span class="n">r_perigee</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">r_apogee</span><span class="o">+</span><span class="n">r_perigee</span><span class="p">)</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="p">(</span><span class="n">r_perigee</span><span class="o">+</span><span class="n">r_apogee</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">a</span><span class="o">*</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">e</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">p</span><span class="o">*</span><span class="n">mu</span><span class="p">)</span>
+
+        <span class="n">rmag0</span> <span class="o">=</span> <span class="n">p</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span><span class="o">+</span><span class="n">e</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">d2r</span><span class="o">*</span><span class="n">trueAnomaly</span><span class="p">))</span>
+        <span class="n">r0_P</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">rmag0</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">d2r</span><span class="o">*</span><span class="n">trueAnomaly</span><span class="p">),</span> <span class="n">rmag0</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">d2r</span><span class="o">*</span><span class="n">trueAnomaly</span><span class="p">),</span> <span class="mi">0</span><span class="p">],</span> <span class="nb">complex</span><span class="p">)</span>
+        <span class="n">v0_P</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">mu</span><span class="o">/</span><span class="n">p</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">d2r</span><span class="o">*</span><span class="n">trueAnomaly</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">mu</span><span class="o">/</span><span class="n">p</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">e</span><span class="o">+</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">d2r</span><span class="o">*</span><span class="n">trueAnomaly</span><span class="p">)),</span> <span class="mi">0</span><span class="p">],</span> <span class="nb">complex</span><span class="p">)</span>
+
+        <span class="n">O_IP</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span>
+        <span class="n">O_IP</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">O_IP</span><span class="p">,</span> <span class="n">getRotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]),</span><span class="n">RAAN</span><span class="o">*</span><span class="n">d2r</span><span class="p">))</span>
+        <span class="n">O_IP</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">O_IP</span><span class="p">,</span> <span class="n">getRotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]),</span><span class="n">Inc</span><span class="o">*</span><span class="n">d2r</span><span class="p">))</span>
+        <span class="n">O_IP</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">O_IP</span><span class="p">,</span> <span class="n">getRotation</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]),</span><span class="n">argPerigee</span><span class="o">*</span><span class="n">d2r</span><span class="p">))</span>
+
+        <span class="n">r0_ECI</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">O_IP</span><span class="p">,</span> <span class="n">r0_P</span><span class="p">)</span>
+        <span class="n">v0_ECI</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">O_IP</span><span class="p">,</span> <span class="n">v0_P</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">r0_ECI</span><span class="p">,</span> <span class="n">v0_ECI</span>
+</div>
+<div class="viewcode-block" id="Orbit_Initial.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Initial.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives, (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="n">h</span> <span class="o">=</span> <span class="mf">1e-16</span>
+        <span class="n">ih</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="nb">complex</span><span class="p">)</span>
+        <span class="n">v</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">altPerigee</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">altApogee</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">RAAN</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Inc</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">argPerigee</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">trueAnomaly</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">J</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">6</span><span class="p">):</span>
+            <span class="n">v</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">ih</span>
+            <span class="n">r0_ECI</span><span class="p">,</span> <span class="n">v0_ECI</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span> <span class="n">v</span><span class="p">[</span><span class="mi">5</span><span class="p">])</span>
+            <span class="n">v</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-=</span> <span class="n">ih</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">r0_ECI</span><span class="o">.</span><span class="n">imag</span><span class="o">/</span><span class="n">h</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">v0_ECI</span><span class="o">.</span><span class="n">imag</span><span class="o">/</span><span class="n">h</span>
+</div>
+<div class="viewcode-block" id="Orbit_Initial.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Initial.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="n">r0_ECI</span><span class="p">,</span> <span class="n">v0_ECI</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">altPerigee</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">altApogee</span><span class="p">,</span>
+                                      <span class="bp">self</span><span class="o">.</span><span class="n">RAAN</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Inc</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">argPerigee</span><span class="p">,</span>
+                                      <span class="bp">self</span><span class="o">.</span><span class="n">trueAnomaly</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I0</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">r0_ECI</span><span class="o">.</span><span class="n">real</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">r_e2b_I0</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span> <span class="o">=</span> <span class="n">v0_ECI</span><span class="o">.</span><span class="n">real</span>
+</div>
+<div class="viewcode-block" id="Orbit_Initial.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Initial.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian &quot;&quot;&quot;</span>
+
+        <span class="n">J</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2b_I0&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s">&#39;altPerigee&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;altPerigee&#39;</span><span class="p">]</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][</span><span class="mi">3</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;altPerigee&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s">&#39;altApogee&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;altApogee&#39;</span><span class="p">]</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][</span><span class="mi">3</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;altApogee&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s">&#39;RAAN&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;RAAN&#39;</span><span class="p">]</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][</span><span class="mi">3</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;RAAN&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s">&#39;Inc&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;Inc&#39;</span><span class="p">]</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][</span><span class="mi">3</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;Inc&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s">&#39;argPerigee&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;argPerigee&#39;</span><span class="p">]</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][</span><span class="mi">3</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">4</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;argPerigee&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s">&#39;trueAnomaly&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][:</span><span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;trueAnomaly&#39;</span><span class="p">]</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">][</span><span class="mi">3</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">5</span><span class="p">]</span><span class="o">*</span><span class="n">arg</span><span class="p">[</span><span class="s">&#39;trueAnomaly&#39;</span><span class="p">]</span>
+
+</div>
+<div class="viewcode-block" id="Orbit_Initial.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.orbit.Orbit_Initial.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian &quot;&quot;&quot;</span>
+
+        <span class="n">J</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J</span>
+
+        <span class="k">if</span> <span class="s">&#39;r_e2b_I0&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">r_e2b_I0</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;r_e2b_I0&#39;</span><span class="p">]</span>
+            <span class="n">r_e2b_I0_0</span> <span class="o">=</span> <span class="n">r_e2b_I0</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>
+            <span class="n">r_e2b_I0_3</span> <span class="o">=</span> <span class="n">r_e2b_I0</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span>
+
+
+            <span class="k">if</span> <span class="s">&#39;altPerigee&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;altPerigee&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_0</span><span class="p">)</span> <span class="o">+</span> \
+                                        <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_3</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s">&#39;altApogee&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;altApogee&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_0</span><span class="p">)</span> <span class="o">+</span> \
+                                       <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_3</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s">&#39;RAAN&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;RAAN&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_0</span><span class="p">)</span> <span class="o">+</span> \
+                                  <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_3</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s">&#39;Inc&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;Inc&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_0</span><span class="p">)</span> <span class="o">+</span> \
+                                 <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">3</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_3</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s">&#39;argPerigee&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;argPerigee&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_0</span><span class="p">)</span> <span class="o">+</span> \
+                                        <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">4</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_3</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s">&#39;trueAnomaly&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;trueAnomaly&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_0</span><span class="p">)</span> <span class="o">+</span> \
+                                         <span class="nb">sum</span><span class="p">(</span><span class="n">J</span><span class="p">[</span><span class="mi">3</span><span class="p">:,</span> <span class="mi">5</span><span class="p">]</span><span class="o">*</span><span class="n">r_e2b_I0_3</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,702 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.rk4 &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.rk4</h1><div class="highlight"><pre>
+<span class="sd">&quot;&quot;&quot; RK4 time integration component &quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">scipy.sparse</span>
+<span class="kn">import</span> <span class="nn">scipy.sparse.linalg</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Component</span>
+<span class="kn">from</span> <span class="nn">openmdao.lib.datatypes.api</span> <span class="kn">import</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">Str</span>
+
+<span class="c"># Allow non-standard variable names for scientific calc</span>
+<span class="c"># pylint: disable-msg=C0103</span>
+
+
+<div class="viewcode-block" id="RK4"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4">[docs]</a><span class="k">class</span> <span class="nc">RK4</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Inherit from this component to use.</span>
+
+<span class="sd">    State variable dimension: (num_states, num_time_points)</span>
+
+<span class="sd">    External input dimension: (input width, num_time_points)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">h</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="o">.</span><span class="mo">01</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;s&quot;</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Time step used for RK4 integration&quot;</span><span class="p">)</span>
+
+    <span class="n">state_var</span> <span class="o">=</span> <span class="n">Str</span><span class="p">(</span><span class="s">&quot;&quot;</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                    <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Name of the variable to be used for time &quot;</span>
+                         <span class="s">&quot;integration&quot;</span><span class="p">)</span>
+
+    <span class="n">init_state_var</span> <span class="o">=</span> <span class="n">Str</span><span class="p">(</span><span class="s">&quot;&quot;</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                         <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Name of the variable to be used for initial &quot;</span>
+                              <span class="s">&quot;conditions&quot;</span><span class="p">)</span>
+
+    <span class="n">external_vars</span> <span class="o">=</span> <span class="n">Array</span><span class="p">([],</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+                          <span class="n">desc</span><span class="o">=</span><span class="s">&quot;List of names of variables that are external &quot;</span>
+                               <span class="s">&quot;to the system but DO vary with time.&quot;</span><span class="p">)</span>
+
+    <span class="n">fixed_external_vars</span> <span class="o">=</span> <span class="n">Array</span><span class="p">([],</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+                                <span class="n">desc</span><span class="o">=</span><span class="s">&quot;List of names of variables that are &quot;</span>
+                                     <span class="s">&quot;external to the system but DO NOT &quot;</span>
+                                     <span class="s">&quot;vary with time.&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RK4.initialize"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.initialize">[docs]</a>    <span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set up dimensions and other data structures.&quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">state_var</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">shape</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ny</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nJ</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">ext</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span><span class="p">:</span>
+            <span class="n">var</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">e</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ext</span><span class="p">)</span>
+
+            <span class="c">#TODO: Check that shape[-1]==self.n</span>
+            <span class="n">ext</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">var</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+
+
+        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fixed_external_vars</span><span class="p">:</span>
+            <span class="n">var</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">e</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ext</span><span class="p">)</span>
+
+            <span class="n">flat_var</span> <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+            <span class="c">#create n copies of the var</span>
+            <span class="n">ext</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">flat_var</span><span class="p">,(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">external</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ext</span><span class="p">)</span>
+
+        <span class="c">#TODO</span>
+        <span class="c">#check that len(y0) = self.n_states</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_external</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ext</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reverse_name_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span><span class="p">:</span><span class="s">&#39;y&#39;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span><span class="p">:</span><span class="s">&#39;y0&#39;</span>
+        <span class="p">}</span>
+        <span class="n">e_vars</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fixed_external_vars</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">var</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">e_vars</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reverse_name_map</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="n">v</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span>
+                              <span class="bp">self</span><span class="o">.</span><span class="n">reverse_name_map</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()])</span>
+
+
+        <span class="c">#TODO</span>
+        <span class="c">#  check that all ext arrays of of shape (self.n, )</span>
+
+        <span class="c">#TODO</span>
+        <span class="c">#check that length of state var and external</span>
+        <span class="c"># vars are the same length</span>
+</div>
+<div class="viewcode-block" id="RK4.f_dot"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.f_dot">[docs]</a>    <span class="k">def</span> <span class="nf">f_dot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Time rate of change of state variables.</span>
+
+<span class="sd">           external: array or external variables for a single time step</span>
+
+<span class="sd">	    state: array of state variables for a single time step.</span>
+
+<span class="sd">            This must be overridden in derived classes.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+</div>
+<div class="viewcode-block" id="RK4.df_dy"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.df_dy">[docs]</a>    <span class="k">def</span> <span class="nf">df_dy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Derivatives of states with respect to states.</span>
+
+<span class="sd">            external: array or external variables for a single time step</span>
+
+<span class="sd">            state: array of state variables for a single time step.</span>
+
+<span class="sd">            This must be overridden in derived classes.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+</div>
+<div class="viewcode-block" id="RK4.df_dx"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.df_dx">[docs]</a>    <span class="k">def</span> <span class="nf">df_dx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;derivatives of states with respect to external vars</span>
+<span class="sd">            external: array or external variables for a single time step</span>
+<span class="sd">            state: array of state variables for a single time step.</span>
+
+<span class="sd">            This must be overridden in derived classes.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+</div>
+<div class="viewcode-block" id="RK4.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Solve for the states at all time integration points.&quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
+
+        <span class="n">n_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span>
+        <span class="n">n_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+
+        <span class="c"># Copy initial state into state array for t=0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">ny</span><span class="p">,</span> <span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">n_state</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0</span>
+
+        <span class="c"># Cache f_dot for use in linearize()</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_state</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">c</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_time</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">k1</span> <span class="o">=</span> <span class="p">(</span><span class="n">k</span><span class="p">)</span><span class="o">*</span><span class="n">n_state</span>
+            <span class="n">k2</span> <span class="o">=</span> <span class="p">(</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">n_state</span>
+
+            <span class="c"># Next state a function of current input</span>
+            <span class="n">ex</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">external</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">external</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> \
+                                       <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+
+            <span class="c"># Next state a function of previous state</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">k1</span><span class="p">:</span><span class="n">k2</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">a</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">f_dot</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">b</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">f_dot</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">/</span><span class="mf">2.</span><span class="o">*</span><span class="n">a</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">c</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">f_dot</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">/</span><span class="mf">2.</span><span class="o">*</span><span class="n">b</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">d</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">f_dot</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">*</span><span class="n">c</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">n_state</span><span class="o">+</span><span class="n">k1</span><span class="p">:</span><span class="n">n_state</span><span class="o">+</span><span class="n">k2</span><span class="p">]</span> <span class="o">=</span> \
+                <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">/</span><span class="mf">6.</span><span class="o">*</span><span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">b</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">+</span> <span class="n">d</span><span class="p">)</span>
+
+        <span class="n">state_var_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name_map</span><span class="p">[</span><span class="s">&#39;y&#39;</span><span class="p">]</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_var_name</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">n_time</span><span class="p">,</span> <span class="n">n_state</span><span class="p">))</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+
+        <span class="c">#print &quot;executed&quot;, self.name</span>
+</div>
+<div class="viewcode-block" id="RK4.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Linearize about current point.&quot;&quot;&quot;</span>
+
+        <span class="n">n_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span>
+        <span class="n">n_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span>
+        <span class="n">I</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">n_state</span><span class="p">)</span>
+
+        <span class="c"># Sparse Jacobian with respect to states</span>
+        <span class="c">#self.Ja = np.zeros((self.nJ, ))</span>
+        <span class="c">#self.Ji = np.zeros((self.nJ, ))</span>
+        <span class="c">#self.Jj = np.zeros((self.nJ, ))</span>
+
+        <span class="c"># Full Jacobian with respect to states</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Jy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="p">))</span>
+
+        <span class="c"># Full Jacobian with respect to inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_external</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="p">))</span>
+
+        <span class="c">#self.Ja[:self.ny] = np.ones((self.ny, ))</span>
+        <span class="c">#self.Ji[:self.ny] = np.arange(self.ny)</span>
+        <span class="c">#self.Jj[:self.ny] = np.arange(self.ny)</span>
+
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_time</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+
+            <span class="n">k1</span> <span class="o">=</span> <span class="n">k</span><span class="o">*</span><span class="n">n_state</span>
+            <span class="n">k2</span> <span class="o">=</span> <span class="n">k1</span> <span class="o">+</span> <span class="n">n_state</span>
+
+            <span class="n">ex</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">external</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">external</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> \
+                                        <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">k1</span><span class="p">:</span><span class="n">k2</span><span class="p">]</span>
+
+            <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">a</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">c</span><span class="p">[:,</span> <span class="n">k</span><span class="p">]</span>
+
+            <span class="c"># State vars</span>
+            <span class="n">df_dy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df_dy</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+            <span class="n">dg_dy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df_dy</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">/</span><span class="mf">2.</span><span class="o">*</span><span class="n">a</span><span class="p">)</span>
+            <span class="n">dh_dy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df_dy</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">/</span><span class="mf">2.</span><span class="o">*</span><span class="n">b</span><span class="p">)</span>
+            <span class="n">di_dy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df_dy</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">*</span><span class="n">c</span><span class="p">)</span>
+
+            <span class="n">da_dy</span> <span class="o">=</span> <span class="n">df_dy</span>
+            <span class="n">db_dy</span> <span class="o">=</span> <span class="n">dg_dy</span> <span class="o">+</span> <span class="n">dg_dy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">h</span><span class="o">/</span><span class="mf">2.</span><span class="o">*</span><span class="n">da_dy</span><span class="p">)</span>
+            <span class="n">dc_dy</span> <span class="o">=</span> <span class="n">dh_dy</span> <span class="o">+</span> <span class="n">dh_dy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">h</span><span class="o">/</span><span class="mf">2.</span><span class="o">*</span><span class="n">db_dy</span><span class="p">)</span>
+            <span class="n">dd_dy</span> <span class="o">=</span> <span class="n">di_dy</span> <span class="o">+</span> <span class="n">di_dy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">h</span><span class="o">*</span><span class="n">dc_dy</span><span class="p">)</span>
+
+            <span class="n">dR_dy</span> <span class="o">=</span> <span class="o">-</span><span class="n">I</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">h</span><span class="o">/</span><span class="mf">6.</span><span class="o">*</span><span class="p">(</span><span class="n">da_dy</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">db_dy</span> <span class="o">+</span> <span class="n">dc_dy</span><span class="p">)</span> <span class="o">+</span> <span class="n">dd_dy</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Jy</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">dR_dy</span>
+
+            <span class="c">#for i in xrange(n_state):</span>
+                <span class="c">#for j in xrange(n_state):</span>
+                    <span class="c">#iJ = self.ny + i + n_state*(j + k1)</span>
+                    <span class="c">#self.Ja[iJ] = dR_dy[i, j]</span>
+                    <span class="c">##self.Ji[iJ] = k2 + i</span>
+                    <span class="c">##self.Jj[iJ] = k1 + j</span>
+                    <span class="c">#self.Ji[iJ] = i*n_time + k + 1</span>
+                    <span class="c">#self.Jj[iJ] = j*n_time + k</span>
+
+                    <span class="c">##print self.Ji[iJ], self.Jj[iJ], self.Ja[iJ]</span>
+
+            <span class="c"># External vars (Inputs)</span>
+            <span class="n">df_dx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df_dx</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+            <span class="n">dg_dx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df_dx</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">/</span><span class="mf">2.</span><span class="o">*</span><span class="n">a</span><span class="p">)</span>
+            <span class="n">dh_dx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df_dx</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">/</span><span class="mf">2.</span><span class="o">*</span><span class="n">b</span><span class="p">)</span>
+            <span class="n">di_dx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df_dx</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">h</span><span class="o">*</span><span class="n">c</span><span class="p">)</span>
+
+            <span class="n">da_dx</span> <span class="o">=</span> <span class="n">df_dx</span>
+            <span class="n">db_dx</span> <span class="o">=</span> <span class="n">dg_dx</span> <span class="o">+</span> <span class="n">dg_dy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">h</span><span class="o">/</span><span class="mi">2</span><span class="o">*</span><span class="n">da_dx</span><span class="p">)</span>
+            <span class="n">dc_dx</span> <span class="o">=</span> <span class="n">dh_dx</span> <span class="o">+</span> <span class="n">dh_dy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">h</span><span class="o">/</span><span class="mi">2</span><span class="o">*</span><span class="n">db_dx</span><span class="p">)</span>
+            <span class="n">dd_dx</span> <span class="o">=</span> <span class="n">di_dx</span> <span class="o">+</span> <span class="n">di_dy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">h</span><span class="o">*</span><span class="n">dc_dx</span><span class="p">)</span>
+
+            <span class="c"># Input-State Jacobian at each time point.</span>
+            <span class="c"># No Jacobian with respect to previous time points.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">h</span><span class="o">/</span><span class="mi">6</span><span class="o">*</span><span class="p">(</span><span class="n">da_dx</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">db_dx</span> <span class="o">+</span> <span class="n">dc_dx</span><span class="p">)</span> <span class="o">+</span> <span class="n">dd_dx</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+
+        <span class="c">#self.J = scipy.sparse.csc_matrix((self.Ja, (self.Ji, self.Jj)),</span>
+                                         <span class="c">#shape=(self.ny, self.ny))</span>
+        <span class="c">#self.JT = self.J.transpose()</span>
+        <span class="c">#self.Minv = scipy.sparse.linalg.splu(self.J).solve</span>
+
+</div>
+<div class="viewcode-block" id="RK4.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="c">#result = self._applyJint(arg, result)</span>
+        <span class="n">result_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_applyJext</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+
+        <span class="n">svar</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span>
+        <span class="k">if</span> <span class="n">svar</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">svar</span><span class="p">]</span> <span class="o">+=</span> <span class="n">result_ext</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">svar</span><span class="p">]</span> <span class="o">=</span> <span class="n">result_ext</span>
+
+    <span class="c"># TODO - Uncommment this when it is supported in OpenMDAO.</span>
+    <span class="c">#def applyMinv(self, arg, result):</span>
+        <span class="c">#&quot;&quot;&quot;Apply derivatives with respect to state variables.&quot;&quot;&quot;</span>
+
+        <span class="c">#state = self.state_var</span>
+
+        <span class="c">#if self.state_var in arg:</span>
+            <span class="c">#flat_y = arg[state].flatten()</span>
+            <span class="c">#result[state] = self.Minv(flat_y).reshape((self.n_states, self.n))</span>
+
+        <span class="c">#return result</span>
+
+
+    <span class="c">#def _applyMinvT(self, arg, result):</span>
+        <span class="c">#&quot;&quot;&quot;Apply derivatives with respect to state variables.&quot;&quot;&quot;</span>
+
+        <span class="c">#state = self.state_var</span>
+        <span class="c">#z = result.copy()</span>
+        <span class="c">#if self.state_var in arg:</span>
+            <span class="c">#flat_y = arg[state].flatten()</span>
+            <span class="c">#result[state] = self.Minv(flat_y, &#39;T&#39;).reshape((self.n_states, self.n))</span>
+
+        <span class="c">#return result</span>
+
+</div>
+    <span class="k">def</span> <span class="nf">_applyJint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Apply derivatives with respect to state variables.&quot;&quot;&quot;</span>
+
+        <span class="n">res1</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="bp">self</span><span class="o">.</span><span class="n">reverse_name_map</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">v</span><span class="p">)</span>
+                     <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()])</span>
+
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span>
+        <span class="k">if</span> <span class="n">state</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="n">flat_y</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="n">state</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&quot;y&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">flat_y</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+
+        <span class="n">res1</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="bp">self</span><span class="o">.</span><span class="n">name_map</span><span class="p">[</span><span class="n">k</span><span class="p">],</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">res1</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()])</span>
+        <span class="k">return</span> <span class="n">res1</span>
+
+    <span class="k">def</span> <span class="nf">_applyJext</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Apply derivatives with respect to inputs&quot;&quot;&quot;</span>
+
+        <span class="c">#Jx --&gt; (n_times, n_external, n_states)</span>
+        <span class="n">n_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_states</span>
+        <span class="n">n_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_state</span><span class="p">,</span> <span class="n">n_time</span><span class="p">))</span>
+
+        <span class="c"># Time-varying inputs</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span><span class="p">:</span>
+
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="c"># take advantage of fact that arg is often pretty sparse</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">])[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="c"># Collapse incoming a*b*...*c*n down to (ab...c)*n</span>
+            <span class="n">var</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">shape</span> <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">shape</span>
+            <span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span>
+                                           <span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+
+            <span class="n">i_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="n">ext_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">][:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">n_time</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+                <span class="n">Jsub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">i_ext</span><span class="p">:</span><span class="n">i_ext</span><span class="o">+</span><span class="n">ext_length</span><span class="p">,</span> <span class="p">:]</span>
+                <span class="n">J_arg</span> <span class="o">=</span> <span class="n">Jsub</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">][:,</span> <span class="n">j</span><span class="p">])</span>
+                <span class="n">result</span><span class="p">[:,</span> <span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">:</span><span class="n">n_time</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">J_arg</span><span class="p">,</span> <span class="p">(</span><span class="n">n_time</span><span class="o">-</span><span class="n">j</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">T</span>
+
+        <span class="c"># Time-invariant inputs</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fixed_external_vars</span><span class="p">:</span>
+
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="c"># take advantage of fact that arg is often pretty sparse</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">])[</span><span class="mi">0</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ext_var</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+            <span class="n">i_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="n">ext_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">n_time</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+                <span class="n">Jsub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">i_ext</span><span class="p">:</span><span class="n">i_ext</span><span class="o">+</span><span class="n">ext_length</span><span class="p">,</span> <span class="p">:]</span>
+                <span class="n">J_arg</span> <span class="o">=</span> <span class="n">Jsub</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+                <span class="n">result</span><span class="p">[:,</span> <span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">:</span><span class="n">n_time</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">J_arg</span><span class="p">,</span> <span class="p">(</span><span class="n">n_time</span><span class="o">-</span><span class="n">j</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">T</span>
+
+        <span class="c"># Initial State</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+
+            <span class="c"># take advantage of fact that arg is often pretty sparse</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">])[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">fact</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_time</span><span class="p">):</span>
+                    <span class="n">fact</span> <span class="o">=</span> <span class="n">fact</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">Jy</span><span class="p">[</span><span class="n">j</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:])</span>
+                    <span class="n">result</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fact</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">arg</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+<div class="viewcode-block" id="RK4.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="n">mode</span> <span class="o">=</span> <span class="s">&#39;Ken&#39;</span>
+
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s">&#39;Ken&#39;</span><span class="p">:</span>
+
+            <span class="n">r2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_applyJextT_limited</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">r2</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="n">v</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s">&#39;John&#39;</span><span class="p">:</span>
+
+            <span class="n">r2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_applyJextT</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+            <span class="n">r1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applyJintT</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">r2</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="n">v</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span> <span class="ow">in</span> <span class="n">r1</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">state_var</span><span class="p">]</span> <span class="o">=</span> <span class="n">r1</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">state_var</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span> <span class="ow">in</span> <span class="n">r1</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span><span class="p">]</span> <span class="o">=</span> <span class="n">r1</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span><span class="p">]</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s">&#39;Pick Ken or John&#39;</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="RK4.applyJintT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.rk4.RK4.applyJintT">[docs]</a>    <span class="k">def</span> <span class="nf">applyJintT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">required_results</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Apply derivatives with respect to state variables.&quot;&quot;&quot;</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span>
+        <span class="n">init_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span>
+
+        <span class="k">if</span> <span class="n">state</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">state</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                <span class="n">flat_y</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="n">state</span><span class="p">]</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">state</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">JT</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">flat_y</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n_states</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+
+                <span class="k">if</span> <span class="n">init_state</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">init_state</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">result</span><span class="p">[</span><span class="n">state</span><span class="p">][:,</span> <span class="mi">0</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+                        <span class="n">result</span><span class="p">[</span><span class="n">init_state</span><span class="p">]</span> <span class="o">-=</span> <span class="n">result</span><span class="p">[</span><span class="n">state</span><span class="p">][:,</span> <span class="n">j</span><span class="p">]</span>
+
+        <span class="c">#print self.J</span>
+        <span class="c">#print &#39;arg&#39;, arg, &#39;result&#39;, result</span>
+        <span class="k">return</span> <span class="n">result</span>
+</div>
+    <span class="k">def</span> <span class="nf">_applyJextT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">required_results</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Apply derivatives with respect to inputs. Ignore all contributions</span>
+<span class="sd">        from past time points and let them come in via previous states</span>
+<span class="sd">        instead.&quot;&quot;&quot;</span>
+
+        <span class="c">#Jx --&gt; (n_times, n_external, n_states)</span>
+        <span class="n">n_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+
+            <span class="n">argsv</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">state_var</span><span class="p">]</span><span class="o">.</span><span class="n">T</span>
+
+            <span class="c"># Use this when we incorporate state deriv</span>
+            <span class="c"># Time-varying inputs</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">i_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                <span class="n">ext_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span><span class="o">/</span><span class="n">n_time</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ext_length</span><span class="p">,</span> <span class="n">n_time</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">n_time</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+
+                    <span class="c"># argsum is often sparse, so check it first</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">argsv</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="p">:])[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">Jsub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">i_ext</span><span class="p">:</span><span class="n">i_ext</span><span class="o">+</span><span class="n">ext_length</span><span class="p">,</span> <span class="p">:]</span>
+                        <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">][:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="n">Jsub</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">argsv</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="p">:])</span>
+
+            <span class="c"># Use this when we incorporate state deriv</span>
+            <span class="c"># Time-invariant inputs</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fixed_external_vars</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">i_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                <span class="n">ext_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ext_length</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">n_time</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+
+                    <span class="c"># argsum is often sparse, so check it first</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">argsv</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="p">:])[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">Jsub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">i_ext</span><span class="p">:</span><span class="n">i_ext</span><span class="o">+</span><span class="n">ext_length</span><span class="p">,</span> <span class="p">:]</span>
+                        <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">+=</span> <span class="n">Jsub</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">argsv</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="p">:])</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_applyJextT_limited</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">required_results</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Apply derivatives with respect to inputs&quot;&quot;&quot;</span>
+
+        <span class="c"># Jx --&gt; (n_times, n_external, n_states)</span>
+        <span class="n">n_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+
+            <span class="n">argsv</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">state_var</span><span class="p">]</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">argsum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">argsv</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+            <span class="c"># Calculate these once, and use for every output</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">n_time</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">argsum</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">argsv</span><span class="p">[</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:,</span> <span class="p">:],</span> <span class="mi">0</span><span class="p">)</span>
+
+            <span class="c"># argsum is often sparse, so save indices.</span>
+            <span class="n">nonzero_k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">argsum</span><span class="o">.</span><span class="n">nonzero</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+
+            <span class="c"># Time-varying inputs</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">i_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                <span class="n">ext_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">/</span> <span class="n">n_time</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ext_length</span><span class="p">,</span> <span class="n">n_time</span><span class="p">))</span>
+
+                <span class="n">i_ext_end</span> <span class="o">=</span> <span class="n">i_ext</span> <span class="o">+</span> <span class="n">ext_length</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">nonzero_k</span><span class="p">:</span>
+                    <span class="n">Jsub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i_ext</span><span class="p">:</span><span class="n">i_ext_end</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">][:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="n">Jsub</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">argsum</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:])</span>
+
+            <span class="c"># Time-invariant inputs</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fixed_external_vars</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">i_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                <span class="n">ext_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ext_length</span><span class="p">))</span>
+
+                <span class="n">i_ext_end</span> <span class="o">=</span> <span class="n">i_ext</span> <span class="o">+</span> <span class="n">ext_length</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">nonzero_k</span><span class="p">:</span>
+                    <span class="n">Jsub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i_ext</span><span class="p">:</span><span class="n">i_ext_end</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">+=</span> <span class="n">Jsub</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">argsum</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:])</span>
+
+            <span class="c"># Initial State</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                <span class="n">fact</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">Jy</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span><span class="o">.</span><span class="n">T</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">argsv</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">fact</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">argsv</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:])</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_time</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+                    <span class="n">fact</span> <span class="o">=</span> <span class="n">fact</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">Jy</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fact</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">argsv</span><span class="p">[</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="p">:])</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_applyJextT_limited_old</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">required_results</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Apply derivatives with respect to inputs&quot;&quot;&quot;</span>
+
+        <span class="c"># Jx --&gt; (n_times, n_external, n_states)</span>
+        <span class="n">n_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+
+            <span class="n">argsv</span> <span class="o">=</span> <span class="n">arg</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">state_var</span><span class="p">]</span><span class="o">.</span><span class="n">T</span>
+            <span class="n">argsum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">argsv</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+            <span class="c"># Calculate these once, and use for every output</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="n">n_time</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">argsum</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">argsv</span><span class="p">[</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:,</span> <span class="p">:],</span> <span class="mi">0</span><span class="p">)</span>
+
+            <span class="c"># argsum is often sparse, so save indices.</span>
+            <span class="n">nonzero_k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">argsum</span><span class="o">.</span><span class="n">nonzero</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+
+            <span class="c"># Time-varying inputs</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">i_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                <span class="n">ext_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">/</span> <span class="n">n_time</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ext_length</span><span class="p">,</span> <span class="n">n_time</span><span class="p">))</span>
+
+                <span class="n">i_ext_end</span> <span class="o">=</span> <span class="n">i_ext</span> <span class="o">+</span> <span class="n">ext_length</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">nonzero_k</span><span class="p">:</span>
+                    <span class="n">Jsub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i_ext</span><span class="p">:</span><span class="n">i_ext_end</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">][:,</span> <span class="n">k</span><span class="p">]</span> <span class="o">+=</span> <span class="n">Jsub</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">argsum</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:])</span>
+
+            <span class="c"># Time-invariant inputs</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fixed_external_vars</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="n">i_ext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ext_index_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+                <span class="n">ext_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ext_length</span><span class="p">))</span>
+
+                <span class="n">i_ext_end</span> <span class="o">=</span> <span class="n">i_ext</span> <span class="o">+</span> <span class="n">ext_length</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">nonzero_k</span><span class="p">:</span>
+                    <span class="n">Jsub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Jx</span><span class="p">[</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i_ext</span><span class="p">:</span><span class="n">i_ext_end</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">+=</span> <span class="n">Jsub</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">argsum</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="p">:])</span>
+
+            <span class="c"># Initial State</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">required_results</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">argsv</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">argsum</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+            <span class="n">ext_var</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">ext_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

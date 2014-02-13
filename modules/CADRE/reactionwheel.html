@@ -1,0 +1,373 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.reactionwheel &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.reactionwheel</h1><div class="highlight"><pre>
+<span class="sd">&#39;&#39;&#39; Reaction wheel discipline for CADRE &#39;&#39;&#39;</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Component</span>
+<span class="kn">from</span> <span class="nn">openmdao.lib.datatypes.api</span> <span class="kn">import</span> <span class="n">Array</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">import</span> <span class="nn">rk4</span>
+
+
+<div class="viewcode-block" id="ReactionWheel_Motor"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Motor">[docs]</a><span class="k">class</span> <span class="nc">ReactionWheel_Motor</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Compute reaction wheel motor torque.&#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ReactionWheel_Motor</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;J_RW&#39;</span><span class="p">,</span> <span class="mf">2.8e-5</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;T_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;N*m&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Torque vector of reaction wheel over time&quot;</span><span class="p">,</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Angular velocity vector in body-fixed frame over time&quot;</span><span class="p">,</span>
+                              <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Angular velocity vector of reaction wheel over time&quot;</span><span class="p">,</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;T_m&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&quot;N*m&quot;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Torque vector of motor over time&quot;</span><span class="p">,</span>
+                              <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ReactionWheel_Motor.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Motor.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;T_RW&#39;</span><span class="p">,</span> <span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="s">&#39;w_RW&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;T_m&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Motor.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Motor.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">w_Bx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dT_dTm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dT_dwb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dT_dh</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="n">dwx_dwb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="n">h_RW</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J_RW</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_RW</span><span class="p">[:]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">w_Bx</span><span class="p">[</span><span class="mi">0</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">w_Bx</span><span class="p">[</span><span class="mi">1</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="n">i</span><span class="p">],</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">w_Bx</span><span class="p">[</span><span class="mi">2</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="n">i</span><span class="p">],</span> <span class="mf">0.</span><span class="p">)</span>
+
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">0</span><span class="p">,:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">1</span><span class="p">,:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">)</span>
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">2</span><span class="p">,:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">0</span><span class="p">,:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">1.</span><span class="p">)</span>
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">1</span><span class="p">,:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">2</span><span class="p">,:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">0</span><span class="p">,:,</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">1</span><span class="p">,:,</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+            <span class="n">dwx_dwb</span><span class="p">[</span><span class="mi">2</span><span class="p">,:,</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">,</span> <span class="mf">0.</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">3</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dT_dTm</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">k</span><span class="p">,</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dT_dwb</span><span class="p">[</span><span class="n">i</span><span class="p">,:,</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">dwx_dwb</span><span class="p">[:,:,</span><span class="n">k</span><span class="p">]</span> <span class="p">,</span> <span class="n">h_RW</span><span class="p">[:,</span><span class="n">i</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dT_dh</span><span class="p">[</span><span class="n">i</span><span class="p">,:,:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">w_Bx</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Motor.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Motor.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">w_Bx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="n">h_RW</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">J_RW</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_RW</span><span class="p">[:]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="n">w_Bx</span><span class="p">[</span><span class="mi">0</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">w_Bx</span><span class="p">[</span><span class="mi">1</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="n">i</span><span class="p">],</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">w_Bx</span><span class="p">[</span><span class="mi">2</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="n">i</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_B</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="n">i</span><span class="p">],</span> <span class="mf">0.</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">T_m</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">T_RW</span><span class="p">[:,</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">w_Bx</span> <span class="p">,</span> <span class="n">h_RW</span><span class="p">[:,</span><span class="n">i</span><span class="p">])</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Motor.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Motor.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;T_m&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="s">&#39;T_RW&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_m&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dTm</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_RW&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span>
+                    <span class="k">if</span> <span class="s">&#39;w_B&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_m&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dwb</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span>
+                    <span class="k">if</span> <span class="s">&#39;w_RW&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_m&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dh</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_RW&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">J_RW</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Motor.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Motor.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;T_m&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="s">&#39;T_RW&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_RW&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dTm</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_m&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+                    <span class="k">if</span> <span class="s">&#39;w_B&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dwb</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_m&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+                    <span class="k">if</span> <span class="s">&#39;w_RW&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_RW&#39;</span><span class="p">][</span><span class="n">j</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dT_dh</span><span class="p">[:,</span><span class="n">k</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_m&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">J_RW</span>
+
+</div></div>
+<div class="viewcode-block" id="ReactionWheel_Power"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Power">[docs]</a><span class="k">class</span> <span class="nc">ReactionWheel_Power</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Compute reaction wheel power.&#39;&#39;&#39;</span>
+
+    <span class="c">#constants</span>
+    <span class="n">V</span> <span class="o">=</span> <span class="mf">4.0</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="mf">4.9e-4</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="mf">4.5e2</span>
+    <span class="n">I0</span> <span class="o">=</span> <span class="mf">0.017</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ReactionWheel_Power</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Angular velocity vector of reaction wheel over time&quot;</span><span class="p">,</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;T_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;N*m&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Torque vector of reaction wheel over time&quot;</span><span class="p">,</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;P_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&#39;W&#39;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&#39;Reaction wheel power over time&#39;</span><span class="p">,</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ReactionWheel_Power.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Power.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;w_RW&#39;</span><span class="p">,</span> <span class="s">&#39;T_RW&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;P_RW&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Power.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Power.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dP_dw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dP_dT</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span><span class="mi">3</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="n">prod</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_RW</span><span class="p">[</span><span class="n">k</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">T_RW</span><span class="p">[</span><span class="n">k</span><span class="p">,</span><span class="n">i</span><span class="p">])</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dP_dw</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="n">prod</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dP_dT</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">*</span> <span class="n">prod</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Power.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Power.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">P_RW</span><span class="p">[</span><span class="n">k</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">a</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_RW</span><span class="p">[</span><span class="n">k</span><span class="p">,</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">T_RW</span><span class="p">[</span><span class="n">k</span><span class="p">,</span><span class="n">i</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">I0</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Power.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Power.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;P_RW&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s">&#39;w_RW&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dP_dw</span><span class="p">[:,</span><span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;w_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+                <span class="k">if</span> <span class="s">&#39;T_RW&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dP_dT</span><span class="p">[:,</span><span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Power.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Power.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;P_RW&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s">&#39;w_RW&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;w_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dP_dw</span><span class="p">[:,</span><span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+                <span class="k">if</span> <span class="s">&#39;T_RW&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dP_dT</span><span class="p">[:,</span><span class="n">k</span><span class="p">]</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_RW&#39;</span><span class="p">][</span><span class="n">k</span><span class="p">,:]</span>
+
+</div></div>
+<div class="viewcode-block" id="ReactionWheel_Torque"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Torque">[docs]</a><span class="k">class</span> <span class="nc">ReactionWheel_Torque</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Compute torque vector of reaction wheel.&#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ReactionWheel_Torque</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;T_tot&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                                <span class="n">units</span><span class="o">=</span><span class="s">&#39;N*m&#39;</span><span class="p">,</span>
+                                <span class="n">desc</span><span class="o">=</span><span class="s">&#39;Total reaction wheel torque over time&#39;</span><span class="p">,</span>
+                                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;T_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span><span class="n">n</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;N*m&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Torque vector of reaction wheel over time&quot;</span><span class="p">,</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ReactionWheel_Torque.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Torque.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;T_tot&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;T_RW&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Torque.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Torque.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives (i.e., Jacobian). &quot;&quot;&quot;</span>
+        <span class="c"># Derivatives are simple</span>
+        <span class="k">return</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Torque.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Torque.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">T_RW</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">T_tot</span><span class="p">[:]</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Torque.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Torque.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;T_tot&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;T_RW&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_RW&#39;</span><span class="p">][:]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_tot&#39;</span><span class="p">][:]</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Torque.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Torque.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="s">&#39;T_RW&#39;</span> <span class="ow">in</span> <span class="n">arg</span> <span class="ow">and</span> <span class="s">&#39;T_tot&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="s">&#39;T_tot&#39;</span><span class="p">][:]</span> <span class="o">+=</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;T_RW&#39;</span><span class="p">][:]</span>
+
+</div></div>
+<div class="viewcode-block" id="ReactionWheel_Dynamics"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Dynamics">[docs]</a><span class="k">class</span> <span class="nc">ReactionWheel_Dynamics</span><span class="p">(</span><span class="n">rk4</span><span class="o">.</span><span class="n">RK4</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;Compute the angular velocity vector of reaction wheel.&#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_times</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ReactionWheel_Dynamics</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_times</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_times</span><span class="p">),</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Angular velocity vector in body-fixed frame over time&quot;</span><span class="p">,</span>
+                              <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;T_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_times</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_times</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;N*m&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Torque vector of reaction wheel over time&quot;</span><span class="p">,</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_RW0&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,),</span>
+                                <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                                <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Initial angular velocity vector of reaction wheel&quot;</span><span class="p">,</span>
+                                <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;in&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;w_RW&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_times</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_times</span><span class="p">),</span>
+                               <span class="n">units</span><span class="o">=</span><span class="s">&quot;1/s&quot;</span><span class="p">,</span>
+                               <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Angular velocity vector of reaction wheel over time&quot;</span><span class="p">,</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&#39;out&#39;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span> <span class="o">=</span> <span class="s">&#39;w_RW&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span> <span class="o">=</span> <span class="s">&#39;w_RW0&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="s">&#39;T_RW&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">jy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">djy_dx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">djy_dx</span><span class="p">[:,:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">djy_dx</span><span class="p">[:,:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">djy_dx</span><span class="p">[:,:,</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">[[</span><span class="mi">0</span><span class="p">,</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">],[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">],[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">J_RW</span> <span class="o">=</span> <span class="mf">2.8e-5</span> <span class="c">#unit conversion of some kind</span>
+
+<div class="viewcode-block" id="ReactionWheel_Dynamics.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Dynamics.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;w_B&#39;</span><span class="p">,</span> <span class="s">&#39;T_RW&#39;</span><span class="p">,</span> <span class="s">&#39;w_RW0&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;w_RW&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Dynamics.f_dot"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Dynamics.f_dot">[docs]</a>    <span class="k">def</span> <span class="nf">f_dot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">jy</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="n">external</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">external</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jy</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">external</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="n">external</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jy</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="n">external</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">external</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mf">0.</span><span class="p">]</span>
+
+        <span class="c">#TODO sort out unit conversion here with T_RW</span>
+        <span class="k">return</span> <span class="p">(</span><span class="o">-</span><span class="n">external</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span><span class="o">/</span><span class="mf">2.8e-5</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">jy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">state</span><span class="p">))</span>
+
+</div>
+<div class="viewcode-block" id="ReactionWheel_Dynamics.df_dy"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Dynamics.df_dy">[docs]</a>    <span class="k">def</span> <span class="nf">df_dy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">jy</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="n">external</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">external</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jy</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">external</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mf">0.</span><span class="p">,</span> <span class="o">-</span><span class="n">external</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jy</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="n">external</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">external</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mf">0.</span><span class="p">]</span>
+        <span class="k">return</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">jy</span>
+</div>
+<div class="viewcode-block" id="ReactionWheel_Dynamics.df_dx"><a class="viewcode-back" href="../../srcdocs.html#CADRE.reactionwheel.ReactionWheel_Dynamics.df_dx">[docs]</a>    <span class="k">def</span> <span class="nf">df_dx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">jx</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">djy_dx</span><span class="p">[:,:,</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">jx</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">i</span><span class="o">+</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">J_RW</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">jx</span>
+</pre></div></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

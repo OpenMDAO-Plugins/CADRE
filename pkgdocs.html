@@ -1,0 +1,257 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Package Metadata &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="index.html" />
+    <link rel="next" title="Glossary" href="glossary.html" />
+    <link rel="prev" title="Source Documentation" href="srcdocs.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="glossary.html" title="Glossary"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="srcdocs.html" title="Source Documentation"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">CADRE 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="package-metadata">
+<h1>Package Metadata<a class="headerlink" href="#package-metadata" title="Permalink to this headline">¶</a></h1>
+<ul>
+<li><p class="first"><strong>author:</strong> Tristan A. Hearn</p>
+</li>
+<li><p class="first"><strong>author-email:</strong> <a class="reference external" href="mailto:tristan&#46;a&#46;hearn&#37;&#52;&#48;nasa&#46;gov">tristan<span>&#46;</span>a<span>&#46;</span>hearn<span>&#64;</span>nasa<span>&#46;</span>gov</a></p>
+</li>
+<li><p class="first"><strong>classifier</strong>:</p>
+<div class="highlight-python"><pre>Intended Audience :: Science/Research
+Topic :: Scientific/Engineering</pre>
+</div>
+</li>
+<li><p class="first"><strong>description-file:</strong> README.txt</p>
+</li>
+<li><p class="first"><strong>entry_points</strong>:</p>
+<div class="highlight-python"><pre>[openmdao.component]
+CADRE.solar.Solar_ExposedArea=CADRE.solar:Solar_ExposedArea
+CADRE.comm.Comm_GainPattern=CADRE.comm:Comm_GainPattern
+CADRE.attitude.Attitude_Attitude=CADRE.attitude:Attitude_Attitude
+CADRE.comm.Comm_VectorECI=CADRE.comm:Comm_VectorECI
+CADRE.reactionwheel.ReactionWheel_Power=CADRE.reactionwheel:ReactionWheel_Power
+CADRE.comm.Comm_BitRate=CADRE.comm:Comm_BitRate
+CADRE.orbit.Orbit_Initial=CADRE.orbit:Orbit_Initial
+CADRE.reactionwheel.ReactionWheel_Torque=CADRE.reactionwheel:ReactionWheel_Torque
+CADRE.attitude.Attitude_Angular=CADRE.attitude:Attitude_Angular
+CADRE.sun.Sun_PositionBody=CADRE.sun:Sun_PositionBody
+CADRE.comm.Comm_EarthsSpinMtx=CADRE.comm:Comm_EarthsSpinMtx
+CADRE.comm.Comm_LOS=CADRE.comm:Comm_LOS
+CADRE.CADRE_launch.Uniformity=CADRE.CADRE_launch:Uniformity
+CADRE.comm.Comm_GSposEarth=CADRE.comm:Comm_GSposEarth
+CADRE.comm.Comm_VectorBody=CADRE.comm:Comm_VectorBody
+CADRE.sun.Sun_PositionSpherical=CADRE.sun:Sun_PositionSpherical
+CADRE.attitude.Attitude_RotationMtx=CADRE.attitude:Attitude_RotationMtx
+CADRE.attitude.Attitude_Roll=CADRE.attitude:Attitude_Roll
+CADRE.power.Power_SolarPower=CADRE.power:Power_SolarPower
+CADRE.sun.Sun_PositionECI=CADRE.sun:Sun_PositionECI
+CADRE.attitude.Attitude_Torque=CADRE.attitude:Attitude_Torque
+CADRE.battery.BatteryConstraints=CADRE.battery:BatteryConstraints
+CADRE.power.Power_CellVoltage=CADRE.power:Power_CellVoltage
+CADRE.attitude.Attitude_RotationMtxRates=CADRE.attitude:Attitude_RotationMtxRates
+CADRE.battery.BatteryPower=CADRE.battery:BatteryPower
+CADRE.rk4.RK4=CADRE.rk4:RK4
+CADRE.CADRE_launch.GroundLOC=CADRE.CADRE_launch:GroundLOC
+CADRE.comm.Comm_AntRotationMtx=CADRE.comm:Comm_AntRotationMtx
+CADRE.power.Power_Total=CADRE.power:Power_Total
+CADRE.test.test_rk_deriv.RKTest=CADRE.test.test_rk_deriv:RKTest
+CADRE.CADRE_assembly.CADRE=CADRE.CADRE_assembly:CADRE
+CADRE.comm.Comm_EarthsSpin=CADRE.comm:Comm_EarthsSpin
+CADRE.comm.Comm_AntRotation=CADRE.comm:Comm_AntRotation
+CADRE.comm.Comm_VectorAnt=CADRE.comm:Comm_VectorAnt
+CADRE.KS.KSComp=CADRE.KS:KSComp
+CADRE.reactionwheel.ReactionWheel_Motor=CADRE.reactionwheel:ReactionWheel_Motor
+CADRE.attitude.Attitude_Sideslip=CADRE.attitude:Attitude_Sideslip
+CADRE.parameters.BsplineParameters=CADRE.parameters:BsplineParameters
+CADRE.comm.Comm_VectorSpherical=CADRE.comm:Comm_VectorSpherical
+CADRE.attitude.Attitude_AngularRates=CADRE.attitude:Attitude_AngularRates
+CADRE.comm.Comm_GSposECI=CADRE.comm:Comm_GSposECI
+CADRE.sun.Sun_LOS=CADRE.sun:Sun_LOS
+CADRE.CADRE_mdp.CADRE_Optimization=CADRE.CADRE_mdp:CADRE_Optimization
+CADRE.thermal_temperature.ThermalTemperature=CADRE.thermal_temperature:ThermalTemperature
+CADRE.CADRE_launch.CADRE_Launch=CADRE.CADRE_launch:CADRE_Launch
+CADRE.comm.Comm_Distance=CADRE.comm:Comm_Distance
+[openmdao.container]
+CADRE.solar.Solar_ExposedArea=CADRE.solar:Solar_ExposedArea
+CADRE.comm.Comm_GainPattern=CADRE.comm:Comm_GainPattern
+CADRE.attitude.Attitude_Attitude=CADRE.attitude:Attitude_Attitude
+CADRE.comm.Comm_VectorECI=CADRE.comm:Comm_VectorECI
+CADRE.reactionwheel.ReactionWheel_Power=CADRE.reactionwheel:ReactionWheel_Power
+CADRE.comm.Comm_BitRate=CADRE.comm:Comm_BitRate
+CADRE.orbit.Orbit_Initial=CADRE.orbit:Orbit_Initial
+CADRE.reactionwheel.ReactionWheel_Torque=CADRE.reactionwheel:ReactionWheel_Torque
+CADRE.attitude.Attitude_Angular=CADRE.attitude:Attitude_Angular
+CADRE.sun.Sun_PositionBody=CADRE.sun:Sun_PositionBody
+CADRE.comm.Comm_EarthsSpinMtx=CADRE.comm:Comm_EarthsSpinMtx
+CADRE.comm.Comm_LOS=CADRE.comm:Comm_LOS
+CADRE.CADRE_launch.Uniformity=CADRE.CADRE_launch:Uniformity
+CADRE.comm.Comm_GSposEarth=CADRE.comm:Comm_GSposEarth
+CADRE.comm.Comm_VectorBody=CADRE.comm:Comm_VectorBody
+CADRE.sun.Sun_PositionSpherical=CADRE.sun:Sun_PositionSpherical
+CADRE.attitude.Attitude_RotationMtx=CADRE.attitude:Attitude_RotationMtx
+CADRE.attitude.Attitude_Roll=CADRE.attitude:Attitude_Roll
+CADRE.power.Power_SolarPower=CADRE.power:Power_SolarPower
+CADRE.sun.Sun_PositionECI=CADRE.sun:Sun_PositionECI
+CADRE.attitude.Attitude_Torque=CADRE.attitude:Attitude_Torque
+CADRE.battery.BatteryConstraints=CADRE.battery:BatteryConstraints
+CADRE.power.Power_CellVoltage=CADRE.power:Power_CellVoltage
+CADRE.attitude.Attitude_RotationMtxRates=CADRE.attitude:Attitude_RotationMtxRates
+CADRE.battery.BatteryPower=CADRE.battery:BatteryPower
+CADRE.rk4.RK4=CADRE.rk4:RK4
+CADRE.CADRE_launch.GroundLOC=CADRE.CADRE_launch:GroundLOC
+CADRE.comm.Comm_AntRotationMtx=CADRE.comm:Comm_AntRotationMtx
+CADRE.power.Power_Total=CADRE.power:Power_Total
+CADRE.test.test_rk_deriv.RKTest=CADRE.test.test_rk_deriv:RKTest
+CADRE.CADRE_assembly.CADRE=CADRE.CADRE_assembly:CADRE
+CADRE.comm.Comm_EarthsSpin=CADRE.comm:Comm_EarthsSpin
+CADRE.comm.Comm_AntRotation=CADRE.comm:Comm_AntRotation
+CADRE.comm.Comm_VectorAnt=CADRE.comm:Comm_VectorAnt
+CADRE.KS.KSComp=CADRE.KS:KSComp
+CADRE.reactionwheel.ReactionWheel_Motor=CADRE.reactionwheel:ReactionWheel_Motor
+CADRE.attitude.Attitude_Sideslip=CADRE.attitude:Attitude_Sideslip
+CADRE.parameters.BsplineParameters=CADRE.parameters:BsplineParameters
+CADRE.comm.Comm_VectorSpherical=CADRE.comm:Comm_VectorSpherical
+CADRE.attitude.Attitude_AngularRates=CADRE.attitude:Attitude_AngularRates
+CADRE.comm.Comm_GSposECI=CADRE.comm:Comm_GSposECI
+CADRE.sun.Sun_LOS=CADRE.sun:Sun_LOS
+CADRE.CADRE_mdp.CADRE_Optimization=CADRE.CADRE_mdp:CADRE_Optimization
+CADRE.thermal_temperature.ThermalTemperature=CADRE.thermal_temperature:ThermalTemperature
+CADRE.CADRE_launch.CADRE_Launch=CADRE.CADRE_launch:CADRE_Launch
+CADRE.comm.Comm_Distance=CADRE.comm:Comm_Distance</pre>
+</div>
+</li>
+<li><p class="first"><strong>home-page:</strong> <a class="reference external" href="https://github.com/OpenMDAO-Plugins/CADRE">https://github.com/OpenMDAO-Plugins/CADRE</a></p>
+</li>
+<li><p class="first"><strong>keywords:</strong> openmdao</p>
+</li>
+<li><p class="first"><strong>license:</strong> Apache 2.0</p>
+</li>
+<li><p class="first"><strong>maintainer:</strong> Tristan A. Hearn</p>
+</li>
+<li><p class="first"><strong>maintainer-email:</strong> <a class="reference external" href="mailto:tristan&#46;a&#46;hearn&#37;&#52;&#48;nasa&#46;gov">tristan<span>&#46;</span>a<span>&#46;</span>hearn<span>&#64;</span>nasa<span>&#46;</span>gov</a></p>
+</li>
+<li><p class="first"><strong>name:</strong> CADRE</p>
+</li>
+<li><p class="first"><strong>requires-dist</strong>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">openmdao</span><span class="o">.</span><span class="n">main</span>
+<span class="n">MBI</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first"><strong>requires-python</strong>:</p>
+<div class="highlight-python"><pre>&gt;=2.6
+&lt;3.0</pre>
+</div>
+</li>
+<li><p class="first"><strong>static_path:</strong> [ &#8216;_static&#8217; ]</p>
+</li>
+<li><p class="first"><strong>summary:</strong> OpenMDAO implementation of the CADRE CubeSat design problem</p>
+</li>
+<li><p class="first"><strong>version:</strong> 0.4</p>
+</li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="srcdocs.html"
+                        title="previous chapter">Source Documentation</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="glossary.html"
+                        title="next chapter">Glossary</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/pkgdocs.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="glossary.html" title="Glossary"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="srcdocs.html" title="Source Documentation"
+             >previous</a> |</li>
+        <li><a href="index.html">CADRE 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

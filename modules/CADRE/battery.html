@@ -1,0 +1,400 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.battery &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.battery</h1><div class="highlight"><pre>
+<span class="sd">&#39;&#39;&#39; Battery discipline for CADRE &#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Component</span>
+<span class="kn">from</span> <span class="nn">openmdao.lib.datatypes.api</span> <span class="kn">import</span> <span class="n">Float</span><span class="p">,</span> <span class="n">Array</span>
+
+<span class="kn">import</span> <span class="nn">KS</span>
+<span class="kn">import</span> <span class="nn">rk4</span>
+
+<span class="c"># Allow non-standard variable names for scientific calc</span>
+<span class="c"># pylint: disable-msg=C0103</span>
+
+<span class="c">#Constants</span>
+<span class="n">sigma</span> <span class="o">=</span> <span class="mf">1e-10</span>
+<span class="n">eta</span> <span class="o">=</span> <span class="mf">0.99</span>
+<span class="n">Cp</span> <span class="o">=</span> <span class="mf">2900.0</span><span class="o">*</span><span class="mf">0.001</span><span class="o">*</span><span class="mf">3600.0</span>
+<span class="n">IR</span> <span class="o">=</span> <span class="mf">0.9</span>
+<span class="n">T0</span> <span class="o">=</span> <span class="mf">293.0</span>
+<span class="n">alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mf">1.1</span><span class="o">**</span><span class="mi">5</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="BatterySOC"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatterySOC">[docs]</a><span class="k">class</span> <span class="nc">BatterySOC</span><span class="p">(</span><span class="n">rk4</span><span class="o">.</span><span class="n">RK4</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Computes the time history of the battery state of charge.</span>
+
+<span class="sd">    n_time: int</span>
+<span class="sd">        number of time_steps to take</span>
+
+<span class="sd">    time_step: float</span>
+<span class="sd">        size of each timestep</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_times</span><span class="p">):</span>
+
+        <span class="nb">super</span><span class="p">(</span><span class="n">BatterySOC</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;iSOC&#39;</span><span class="p">,</span>
+                 <span class="n">Array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">],</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                       <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Initial state of charge&quot;</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;P_bat&#39;</span><span class="p">,</span>
+                 <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_times</span><span class="p">,</span> <span class="p">)),</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_times</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                       <span class="n">units</span><span class="o">=</span><span class="s">&quot;W&quot;</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery power over time&quot;</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;temperature&#39;</span><span class="p">,</span>
+            <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="n">n_times</span> <span class="p">)),</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">n_times</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                  <span class="n">units</span><span class="o">=</span><span class="s">&quot;degK&quot;</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery temperature over time&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;SOC&#39;</span><span class="p">,</span>
+                 <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_times</span><span class="p">)),</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_times</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                       <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery state of charge over time&quot;</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span> <span class="o">=</span> <span class="s">&quot;SOC&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span> <span class="o">=</span> <span class="s">&quot;iSOC&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;P_bat&quot;</span><span class="p">,</span> <span class="s">&quot;temperature&quot;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="BatterySOC.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatterySOC.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;iSOC&#39;</span><span class="p">,</span> <span class="s">&#39;P_bat&#39;</span><span class="p">,</span><span class="s">&#39;temperature&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;SOC&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="BatterySOC.f_dot"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatterySOC.f_dot">[docs]</a>    <span class="k">def</span> <span class="nf">f_dot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Rate of change of SOC&quot;&quot;&quot;</span>
+
+        <span class="n">SOC</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">P</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+
+
+        <span class="n">voc</span> <span class="o">=</span> <span class="mi">3</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">expm1</span><span class="p">(</span><span class="n">SOC</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c">#dVoc_dSOC = np.exp(SOC) / (np.e-1)</span>
+
+        <span class="n">V</span> <span class="o">=</span> <span class="n">IR</span> <span class="o">*</span> <span class="n">voc</span> <span class="o">*</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">alpha</span><span class="o">*</span><span class="p">(</span><span class="n">T</span><span class="o">-</span><span class="n">T0</span><span class="p">)</span><span class="o">/</span><span class="n">T0</span><span class="p">))</span>
+        <span class="n">I</span> <span class="o">=</span> <span class="n">P</span><span class="o">/</span><span class="n">V</span>
+
+        <span class="n">soc_dot</span> <span class="o">=</span> <span class="o">-</span><span class="n">sigma</span><span class="o">/</span><span class="mi">24</span><span class="o">*</span><span class="n">SOC</span> <span class="o">+</span> <span class="n">eta</span><span class="o">/</span><span class="n">Cp</span><span class="o">*</span><span class="n">I</span>
+        <span class="k">return</span> <span class="n">soc_dot</span>
+</div>
+<div class="viewcode-block" id="BatterySOC.df_dy"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatterySOC.df_dy">[docs]</a>    <span class="k">def</span> <span class="nf">df_dy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; State deriative &quot;&quot;&quot;</span>
+
+        <span class="n">SOC</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">P</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+
+        <span class="n">voc</span> <span class="o">=</span> <span class="mi">3</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">expm1</span><span class="p">(</span><span class="n">SOC</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">dVoc_dSOC</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">SOC</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">tmp</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">alpha</span><span class="o">*</span><span class="p">(</span><span class="n">T</span><span class="o">-</span><span class="n">T0</span><span class="p">)</span><span class="o">/</span><span class="n">T0</span><span class="p">)</span>
+        <span class="n">V</span> <span class="o">=</span> <span class="n">IR</span> <span class="o">*</span> <span class="n">voc</span> <span class="o">*</span> <span class="n">tmp</span>
+        <span class="c">#I = P/V</span>
+
+        <span class="n">dV_dSOC</span> <span class="o">=</span> <span class="n">IR</span> <span class="o">*</span> <span class="n">dVoc_dSOC</span> <span class="o">*</span> <span class="n">tmp</span>
+        <span class="n">dI_dSOC</span> <span class="o">=</span> <span class="o">-</span><span class="n">P</span><span class="o">/</span><span class="n">V</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">dV_dSOC</span>
+
+        <span class="n">df_dy</span> <span class="o">=</span> <span class="o">-</span><span class="n">sigma</span><span class="o">/</span><span class="mi">24</span> <span class="o">+</span> <span class="n">eta</span><span class="o">/</span><span class="n">Cp</span><span class="o">*</span><span class="n">dI_dSOC</span>
+
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">df_dy</span><span class="p">]])</span>
+</div>
+<div class="viewcode-block" id="BatterySOC.df_dx"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatterySOC.df_dx">[docs]</a>    <span class="k">def</span> <span class="nf">df_dx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Output deriative &quot;&quot;&quot;</span>
+
+        <span class="n">SOC</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">P</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">voc</span> <span class="o">=</span> <span class="mi">3</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">expm1</span><span class="p">(</span><span class="n">SOC</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c">#dVoc_dSOC = np.exp(SOC) / (np.e-1)</span>
+
+        <span class="n">tmp</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">alpha</span><span class="o">*</span><span class="p">(</span><span class="n">T</span><span class="o">-</span><span class="n">T0</span><span class="p">)</span><span class="o">/</span><span class="n">T0</span><span class="p">)</span>
+
+        <span class="n">V</span> <span class="o">=</span> <span class="n">IR</span> <span class="o">*</span> <span class="n">voc</span> <span class="o">*</span> <span class="n">tmp</span>
+        <span class="c">#I = P/V</span>
+
+        <span class="n">dV_dT</span> <span class="o">=</span> <span class="o">-</span> <span class="n">IR</span> <span class="o">*</span> <span class="n">voc</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">alpha</span><span class="o">*</span><span class="p">(</span><span class="n">T</span><span class="o">-</span><span class="n">T0</span><span class="p">)</span><span class="o">/</span><span class="n">T0</span><span class="p">)</span> <span class="o">*</span> <span class="n">alpha</span><span class="o">/</span><span class="n">T0</span>
+        <span class="n">dI_dT</span> <span class="o">=</span> <span class="o">-</span> <span class="n">P</span><span class="o">/</span><span class="n">V</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">dV_dT</span>
+        <span class="n">dI_dP</span> <span class="o">=</span> <span class="mf">1.0</span><span class="o">/</span><span class="n">V</span>
+
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">eta</span><span class="o">/</span><span class="n">Cp</span><span class="o">*</span><span class="n">dI_dP</span><span class="p">,</span> <span class="mi">0</span> <span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">eta</span><span class="o">/</span><span class="n">Cp</span><span class="o">*</span><span class="n">dI_dT</span><span class="p">]])</span>
+
+</div></div>
+<div class="viewcode-block" id="BatteryPower"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryPower">[docs]</a><span class="k">class</span> <span class="nc">BatteryPower</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Power supplied by the battery&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">BatteryPower</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;SOC&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                              <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery state of charge over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;temperature&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span>
+                                      <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                                      <span class="n">units</span><span class="o">=</span><span class="s">&quot;degK&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery temperature over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;P_bat&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;W&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery power over time&quot;</span><span class="p">))</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;I_bat&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="p">)),</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;A&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery Current over time&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="BatteryPower.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryPower.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">exponential</span> <span class="o">=</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">alpha</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">temperature</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="p">:]</span><span class="o">-</span><span class="n">T0</span><span class="p">)</span><span class="o">/</span><span class="n">T0</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">voc</span> <span class="o">=</span> <span class="mf">3.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">expm1</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SOC</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:])</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">V</span> <span class="o">=</span> <span class="n">IR</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">voc</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">exponential</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">I_bat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">P_bat</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span>
+</div>
+<div class="viewcode-block" id="BatteryPower.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryPower.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;SOC&#39;</span><span class="p">,</span> <span class="s">&#39;temperature&#39;</span><span class="p">,</span><span class="s">&#39;P_bat&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;I_bat&#39;</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="BatteryPower.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryPower.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives. (i.e., Jacobian) &quot;&quot;&quot;</span>
+
+        <span class="c">#dI_dP</span>
+        <span class="n">dV_dvoc</span> <span class="o">=</span> <span class="n">IR</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">exponential</span>
+        <span class="n">dV_dT</span> <span class="o">=</span> <span class="o">-</span> <span class="n">IR</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">voc</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">alpha</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">temperature</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span>
+                                                <span class="n">T0</span><span class="p">)</span><span class="o">/</span><span class="n">T0</span><span class="p">)</span> <span class="o">*</span> <span class="n">alpha</span> <span class="o">/</span> <span class="n">T0</span>
+        <span class="n">dVoc_dSOC</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SOC</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:])</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dI_dP</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">V</span>
+        <span class="n">tmp</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">P_bat</span><span class="o">/</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">V</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dI_dT</span> <span class="o">=</span> <span class="n">tmp</span> <span class="o">*</span> <span class="n">dV_dT</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dI_dSOC</span> <span class="o">=</span> <span class="n">tmp</span> <span class="o">*</span> <span class="n">dV_dvoc</span> <span class="o">*</span> <span class="n">dVoc_dSOC</span>
+</div>
+<div class="viewcode-block" id="BatteryPower.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryPower.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;I_bat&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+
+            <span class="k">if</span> <span class="s">&#39;P_bat&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dI_dP</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="s">&#39;temperature&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dI_dT</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;temperature&#39;</span><span class="p">][</span><span class="mi">4</span><span class="p">,</span> <span class="p">:]</span>
+
+            <span class="k">if</span> <span class="s">&#39;SOC&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dI_dSOC</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+</div>
+<div class="viewcode-block" id="BatteryPower.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryPower.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;I_bat&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+
+            <span class="k">if</span> <span class="s">&#39;P_bat&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;P_bat&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dI_dP</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="s">&#39;temperature&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;temperature&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">temperature</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;temperature&#39;</span><span class="p">][</span><span class="mi">4</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dI_dT</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="s">&#39;SOC&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SOC</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dI_dSOC</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span>
+
+
+</div></div>
+<div class="viewcode-block" id="BatteryConstraints"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryConstraints">[docs]</a><span class="k">class</span> <span class="nc">BatteryConstraints</span><span class="p">(</span><span class="n">Component</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Some KS constraints for the battery. I believe this essentially</span>
+<span class="sd">    replaces a cycle in the graph.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c"># Outputs</span>
+    <span class="n">ConCh</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;A&quot;</span><span class="p">,</span>
+                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Constraint on charging rate&quot;</span><span class="p">)</span>
+
+    <span class="n">ConDs</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;A&quot;</span><span class="p">,</span>
+                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Constraint on discharging rate&quot;</span><span class="p">)</span>
+
+    <span class="n">ConS0</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Constraint on minimum state of charge&quot;</span><span class="p">)</span>
+
+    <span class="n">ConS1</span> <span class="o">=</span> <span class="n">Float</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                  <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Constraint on maximum state of charge&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">BatteryConstraints</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">rho</span> <span class="o">=</span> <span class="mi">50</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Imin</span> <span class="o">=</span> <span class="o">-</span><span class="mf">10.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Imax</span> <span class="o">=</span> <span class="mf">5.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">SOC0</span> <span class="o">=</span> <span class="mf">0.2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">SOC1</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;I_bat&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,)),</span>
+                                <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n</span><span class="p">,),</span>
+                                <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                                <span class="n">units</span><span class="o">=</span><span class="s">&quot;A&quot;</span><span class="p">,</span>
+                                <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery current over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;SOC&#39;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">)),</span>
+                              <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span>
+                              <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&quot;unitless&quot;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Battery state of charge over time&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">KS_ch</span> <span class="o">=</span> <span class="n">KS</span><span class="o">.</span><span class="n">KSfunction</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">KS_ds</span> <span class="o">=</span> <span class="n">KS</span><span class="o">.</span><span class="n">KSfunction</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">KS_s0</span> <span class="o">=</span> <span class="n">KS</span><span class="o">.</span><span class="n">KSfunction</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">KS_s1</span> <span class="o">=</span> <span class="n">KS</span><span class="o">.</span><span class="n">KSfunction</span><span class="p">()</span>
+
+<div class="viewcode-block" id="BatteryConstraints.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryConstraints.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;I_bat&#39;</span><span class="p">,</span> <span class="s">&#39;SOC&#39;</span><span class="p">,)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;ConCh&#39;</span><span class="p">,</span><span class="s">&#39;ConDs&#39;</span><span class="p">,</span><span class="s">&#39;ConS0&#39;</span><span class="p">,</span><span class="s">&#39;ConS1&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="BatteryConstraints.execute"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryConstraints.execute">[docs]</a>    <span class="k">def</span> <span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate output. &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ConCh</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KS_ch</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">I_bat</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">Imax</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rho</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ConDs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KS_ds</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Imin</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">I_bat</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rho</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ConS0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KS_s0</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SOC0</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">SOC</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rho</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ConS1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KS_s1</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">SOC</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">SOC1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rho</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="BatteryConstraints.provideJ"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryConstraints.provideJ">[docs]</a>    <span class="k">def</span> <span class="nf">provideJ</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Calculate and save derivatives (i.e., Jacobian). &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dCh_dg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dCh_drho</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KS_ch</span><span class="o">.</span><span class="n">derivatives</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dDs_dg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dDs_drho</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KS_ds</span><span class="o">.</span><span class="n">derivatives</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dS0_dg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dS0_drho</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KS_s0</span><span class="o">.</span><span class="n">derivatives</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dS1_dg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dS1_drho</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">KS_s1</span><span class="o">.</span><span class="n">derivatives</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="BatteryConstraints.apply_deriv"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryConstraints.apply_deriv">[docs]</a>    <span class="k">def</span> <span class="nf">apply_deriv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;I_bat&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s">&#39;ConCh&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;ConCh&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dCh_dg</span><span class="p">,</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="s">&#39;ConDs&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;ConDs&#39;</span><span class="p">]</span> <span class="o">-=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dDs_dg</span><span class="p">,</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="s">&#39;SOC&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s">&#39;ConS0&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;ConS0&#39;</span><span class="p">]</span> <span class="o">-=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dS0_dg</span><span class="p">,</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">,</span> <span class="p">:])</span>
+            <span class="k">if</span> <span class="s">&#39;ConS1&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;ConS1&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dS1_dg</span><span class="p">,</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">,</span> <span class="p">:])</span>
+</div>
+<div class="viewcode-block" id="BatteryConstraints.apply_derivT"><a class="viewcode-back" href="../../srcdocs.html#CADRE.battery.BatteryConstraints.apply_derivT">[docs]</a>    <span class="k">def</span> <span class="nf">apply_derivT</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Matrix-vector product with the transpose of the Jacobian. &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="s">&#39;I_bat&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s">&#39;ConCh&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dCh_dg</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;ConCh&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s">&#39;ConDs&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;I_bat&#39;</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dDs_dg</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;ConDs&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="s">&#39;SOC&#39;</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s">&#39;ConS0&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">]</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dS0_dg</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;ConS0&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s">&#39;ConS1&#39;</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s">&#39;SOC&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dS1_dg</span> <span class="o">*</span> <span class="n">arg</span><span class="p">[</span><span class="s">&#39;ConS1&#39;</span><span class="p">]</span>
+</pre></div></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

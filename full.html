@@ -1,0 +1,360 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Running the Full CADRE Problem &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="index.html" />
+    <link rel="next" title="Source Documentation" href="srcdocs.html" />
+    <link rel="prev" title="Example: Optimization of the CADRE Roll Angle" href="roll.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="srcdocs.html" title="Source Documentation"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="roll.html" title="Example: Optimization of the CADRE Roll Angle"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">CADRE 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="running-the-full-cadre-problem">
+<h1>Running the Full CADRE Problem<a class="headerlink" href="#running-the-full-cadre-problem" title="Permalink to this headline">¶</a></h1>
+<p>The previous tutorials provided short practical introductions to some of the
+OpenMDAO components which are used in the CADRE problem. To run the full
+CADRE problem:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Obtain a license and source code for <a class="reference external" href="http://www.sbsi-sol-optimize.com/asp/sol_product_snopt.htm">SNOPT</a></li>
+<li>Build and install <a class="reference external" href="http://www.pyopt.org/">PyOpt</a> with SNOPT support</li>
+<li>Install <a class="reference external" href="https://github.com/OpenMDAO-Plugins/pyopt_driver">pyopt_driver</a> for OpenMDAO</li>
+</ul>
+</div></blockquote>
+<p>The CADRE optimization problem can then be run by importing and running the
+<tt class="docutils literal"><span class="pre">CADRE_Optimization</span></tt> assembly:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">openmdao.lib.casehandlers.api</span> <span class="kn">import</span> <span class="n">CSVCaseRecorder</span>
+<span class="kn">from</span> <span class="nn">CADRE</span> <span class="kn">import</span> <span class="n">CADRE_Optimization</span>
+
+<span class="k">print</span> <span class="s">&quot;setting up&quot;</span>
+<span class="n">top</span> <span class="o">=</span> <span class="n">CADRE_Optimization</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">1500</span><span class="p">,</span> <span class="n">m</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
+<span class="n">top</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">recorders</span> <span class="o">=</span> <span class="p">[</span><span class="n">CSVCaseRecorder</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s">&#39;CADRE.csv&#39;</span><span class="p">)]</span>
+<span class="n">printvars</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;Data&#39;</span><span class="p">,</span> <span class="s">&#39;ConCh&#39;</span><span class="p">,</span> <span class="s">&#39;ConDs&#39;</span><span class="p">,</span> <span class="s">&#39;ConS0&#39;</span><span class="p">,</span> <span class="s">&#39;ConS1&#39;</span><span class="p">,</span> <span class="s">&#39;SOC&#39;</span><span class="p">]:</span>
+    <span class="n">printvars</span> <span class="o">+=</span> <span class="p">[</span><span class="s">&quot;pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.Data&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+<span class="n">top</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">printvars</span> <span class="o">=</span> <span class="n">printvars</span>
+<span class="k">print</span> <span class="s">&quot;running&quot;</span>
+<span class="n">top</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>This is implemented in <tt class="docutils literal"><span class="pre">example.py</span></tt>, in the top-level directory of the CADRE
+plugin repository.
+The purpose of the CSV case recorder is to save the state of the optimization
+after each iteration of the assembly&#8217;s driver. These iteration states will be
+saved as lines in the file <tt class="docutils literal"><span class="pre">CADRE.csv</span></tt>. You can read from this file and
+examine the performance of the optimization after the optimization has completed
+or even while the optimization is still occurring.</p>
+<p>An example of how this file may be inspected:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">csv</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pylab</span>
+
+<span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="s">&quot;CADRE.csv&quot;</span><span class="p">,</span> <span class="s">&quot;rb&quot;</span><span class="p">)</span>
+<span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">DictReader</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+<span class="n">X</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">Z</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
+
+<span class="n">pcom</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s">&quot;pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.Data[0][1499]&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+    <span class="n">sumdata</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">data</span> <span class="k">if</span> <span class="n">i</span><span class="p">])</span>
+    <span class="n">c1</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s">&quot;Constraint ( pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.ConCh&lt;=0 )&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+    <span class="n">c2</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s">&quot;Constraint ( pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.ConDs&lt;=0 )&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+    <span class="n">c3</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s">&quot;Constraint ( pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.ConS0&lt;=0 )&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+    <span class="n">c4</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s">&quot;Constraint ( pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.ConS1&lt;=0 )&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+    <span class="n">c5</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="s">&quot;Constraint ( pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.SOC[0][0]=pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.SOC[0][-1] )&quot;</span><span class="p">]</span>
+          <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+    <span class="c"># c1_f = np.all([float(i) &lt; 0 for i in c1 if i])</span>
+    <span class="c"># c2_f = np.all([float(i) &lt; 0 for i in c2 if i])</span>
+    <span class="c"># c3_f = np.all([float(i) &lt; 0 for i in c3 if i])</span>
+    <span class="c"># c4_f = np.all([float(i) &lt; 0 for i in c4 if i])</span>
+    <span class="c"># c5_f = np.all([float(i) &lt; 0 for i in c4 if i])</span>
+
+    <span class="n">c1_f</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">c1</span> <span class="k">if</span> <span class="n">i</span><span class="p">])</span>
+    <span class="n">c2_f</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">c2</span> <span class="k">if</span> <span class="n">i</span><span class="p">])</span>
+    <span class="n">c3_f</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">c3</span> <span class="k">if</span> <span class="n">i</span><span class="p">])</span>
+    <span class="n">c4_f</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">c4</span> <span class="k">if</span> <span class="n">i</span><span class="p">])</span>
+    <span class="n">c5_f</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">c5</span> <span class="k">if</span> <span class="n">i</span><span class="p">])</span>
+
+    <span class="n">feasible</span> <span class="o">=</span> <span class="p">[</span><span class="n">c1_f</span><span class="p">,</span> <span class="n">c2_f</span><span class="p">,</span>  <span class="n">c3_f</span><span class="p">,</span> <span class="n">c4_f</span><span class="p">,</span> <span class="n">c5_f</span><span class="p">]</span>
+
+    <span class="n">X</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sumdata</span><span class="p">),</span> <span class="n">Y</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">feasible</span><span class="p">)),</span> <span class="n">Z</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">feasible</span><span class="p">)</span>
+
+    <span class="k">print</span> <span class="n">sumdata</span>
+
+<span class="n">Z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Z</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">Z</span><span class="p">):</span>
+    <span class="k">print</span> <span class="s">&quot;no data yet...&quot;</span>
+    <span class="n">quit</span><span class="p">()</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">311</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&quot;total data&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s">&#39;b&#39;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)],</span> <span class="p">[</span><span class="mf">3e4</span><span class="p">,</span> <span class="mf">3e4</span><span class="p">],</span> <span class="s">&#39;k--&#39;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s">&quot;o&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">312</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&quot;Sum of Constraints&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">Y</span><span class="p">)],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s">&#39;k--&#39;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="s">&quot;o&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Y</span><span class="p">,</span> <span class="s">&#39;k&#39;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">313</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s">&quot;Max of Constraints&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">Z</span><span class="p">)],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="s">&#39;k--&#39;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Z</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">&quot;o&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">&quot;c1&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Z</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">&quot;o&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">&quot;c2&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Z</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">&quot;o&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">&quot;c3&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Z</span><span class="p">[:,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">&quot;o&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">&quot;c4&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Z</span><span class="p">[:,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s">&quot;o&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s">&quot;c5&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="s">&quot;best&quot;</span><span class="p">)</span>
+<span class="n">pylab</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>This is implemented in <tt class="docutils literal"><span class="pre">readcsv.py</span></tt>, in the top-level directory of the CADRE
+plugin repository. When run, this will print the total data downloaded for each <a class="reference internal" href="glossary.html#term-mdp"><em class="xref std std-term">MDP</em></a> at each iteration of
+the optimization. This code produces a figure like the following:</p>
+<a class="reference internal image-reference" href="_images/opt.png"><img alt="_images/opt.png" class="align-center" src="_images/opt.png" style="width: 950px;" /></a>
+<p>This figure shows several values plotted over the course of the optimization iterations. For this run, the CADRE problem
+converged in about 150 iterations (six hours or so of runtime on a Macbook Pro 2.3GHz i7). The top subplot shows the
+objective function value (total data downloaded); the middle subplot shows the maximum value of all constraints (values
+are all less than or equal to 0 for feasibility); and the bottom subplot shows the maximum constraint values (across the
+six design points), broken down according to the five constraint types.</p>
+<p>During the course of the optimization, the SNOPT optimizer will produce a
+basis file, <tt class="docutils literal"><span class="pre">fort.10</span></tt>. In the event of a premature termination of the optimization,
+SNOPT will automatically try to restart from the state determined by this file
+the next time that the optimization is run in the same directory. If you would
+rather cold start the problem, this file can simply be deleted prior to
+initializing an optimization if it exists.</p>
+<p>We can easily rerun the problem with different configurations, such as a change in placement of the ground station,
+different lengths of time for the design points, etc. For example, if we wanted to re-optimize the entire problem but with
+McMurdo Station, Antarctica, as the ground station, we could run:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">openmdao.lib.casehandlers.api</span> <span class="kn">import</span> <span class="n">CSVCaseRecorder</span>
+<span class="kn">from</span> <span class="nn">CADRE</span> <span class="kn">import</span> <span class="n">CADRE_Optimization</span>
+
+<span class="k">print</span> <span class="s">&quot;setting up&quot;</span>
+<span class="n">top</span> <span class="o">=</span> <span class="n">CADRE_Optimization</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">1500</span><span class="p">,</span> <span class="n">m</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
+
+<span class="c"># reset ground station for each CADRE design point</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">):</span>
+    <span class="n">pt</span> <span class="o">=</span> <span class="n">top</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">&quot;pt</span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">))</span>
+    <span class="n">pt</span><span class="o">.</span><span class="n">lat</span> <span class="o">=</span> <span class="o">-</span><span class="mf">77.85</span> <span class="c"># McMurdo latitude</span>
+    <span class="n">pt</span><span class="o">.</span><span class="n">lon</span> <span class="o">=</span> <span class="mf">166.666667</span> <span class="c"># longitude</span>
+    <span class="n">pt</span><span class="o">.</span><span class="n">alt</span> <span class="o">=</span> <span class="mf">2.835</span> <span class="c"># Altitude</span>
+
+<span class="n">top</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">recorders</span> <span class="o">=</span> <span class="p">[</span><span class="n">CSVCaseRecorder</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="s">&#39;CADRE.csv&#39;</span><span class="p">)]</span>
+<span class="n">printvars</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;Data&#39;</span><span class="p">,</span> <span class="s">&#39;ConCh&#39;</span><span class="p">,</span> <span class="s">&#39;ConDs&#39;</span><span class="p">,</span> <span class="s">&#39;ConS0&#39;</span><span class="p">,</span> <span class="s">&#39;ConS1&#39;</span><span class="p">,</span> <span class="s">&#39;SOC&#39;</span><span class="p">]:</span>
+    <span class="n">printvars</span> <span class="o">+=</span> <span class="p">[</span><span class="s">&quot;pt&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot;.Data&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">xrange</span><span class="p">(</span><span class="mi">6</span><span class="p">)]</span>
+<span class="n">top</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">printvars</span> <span class="o">=</span> <span class="n">printvars</span>
+<span class="k">print</span> <span class="s">&quot;running&quot;</span>
+<span class="n">top</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>This will generate a <tt class="docutils literal"><span class="pre">CADRE.csv</span></tt> file, just as before.</p>
+</div>
+<div class="section" id="interactive-visualization-of-results">
+<h1>Interactive Visualization of Results<a class="headerlink" href="#interactive-visualization-of-results" title="Permalink to this headline">¶</a></h1>
+<p>Once an optimization of CADRE has successfully completed, you can run <tt class="docutils literal"><span class="pre">generate_maps.py</span></tt> in the top-level directory of
+the CADRE plugin repository to generate some graphical summaries of the optimized design.</p>
+<p>This will render a plot of several optimized parameters over the time period covered by that design point: the data
+download rate, the power to the communications system, the roll angle, and the battery state-of-charge.</p>
+<p>This script will also generate a Google Maps document (HTML file) that has the trajectories
+of the CADRE satellite plotted for the selected design point. These trajectory lines
+are colored based on the data download rate of the satellite at that period of time.</p>
+<p>Note that an Internet connection is required to load the maps.</p>
+<p>Examples of these plots and maps are shown interactively below. You can click on the radio buttons to select between
+two separate optimizations: one with Ann Arbor, Michigan, as the ground station (default) or one with McMurdo Station,
+Antarctica, as the ground station. You can also choose to view data for each of the six CADRE design points
+individually.</p>
+<p>Clicking the <cite>Earth</cite> button in the maps view will render the results using
+Google Earth (which requires the Google Earth plugin for your browser).</p>
+<p>These two plots can be compared directly: peaks in the download rate indicated in
+the data figure should correspond to a pass of the satellite&#8217;s orbit near the selected ground station.</p>
+<script>
+
+total_data = {0:30820, 1:82727}
+
+gs_id = 0;
+pt = 0;
+
+function refresh() {
+    url = "_downloads/" + String(gs_id) + "_" + String(pt) + "_data.html";
+    url2 = "_images/" + String(gs_id) + "_" + String(pt) + ".png";
+    document.getElementById('map').src = url;
+    document.getElementById('plot').src = url2;
+    $('#totaldata').text(total_data[gs_id]);
+}
+
+function to(val) {
+    pt = val;
+    refresh();
+}
+
+function gs_change(val) {
+    gs_id = val;
+    refresh();
+}
+
+</script>
+<div style="margin-top:10px;">
+<table style="width: auto; margin: auto;"><tr><td style="width: auto; margin: auto;"><hr>
+Ground station:<hr>
+<input type="radio" name="gs" id="gs0" value="0" onclick="gs_change(0);" checked="checked" />Ann Arbor, MI, USA<br>
+<input type="radio" name="gs" id="gs1" value="1" onclick="gs_change(1);" />McMurdo Station, Antarctica<br><hr>
+
+Design point:<hr>
+<input type="radio" name="pt" id="bt0" value="0" onclick="to(0);" checked="checked" />1 month after launch<br>
+<input type="radio" name="pt" id="bt1" value="1" onclick="to(1);" />3 months after launch<br>
+<input type="radio" name="pt" id="bt2" value="2" onclick="to(2);" />5 months after launch<br>
+<input type="radio" name="pt" id="bt3" value="3" onclick="to(3);" />7 months after launch<br>
+<input type="radio" name="pt" id="bt4" value="4" onclick="to(4);" />9 months after launch<br>
+<input type="radio" name="pt" id="bt5" value="5" onclick="to(5);" />11 months after launch<br>
+<input type="radio" name="pt" id="bt6" value="6" onclick="to('all');" />All design points (map only)<br><hr>
+
+<br>Total Data Downloaded:<br><br><center><h3><span id="totaldata">
+30820
+</span> Gb</b></h3></center>
+</td><td style="width: auto; margin: auto;">
+    <center><img src = "_images/0_0.png" id="plot" width=500></center></td></tr></table>
+    <center>
+  <iframe width="1000" height="500" id="map" src="_downloads/0_0_data.html" frameborder="0" allowfullscreen></iframe></center>
+</div><p>Fullscreen map views:</p>
+<ul class="simple">
+<li><a class="reference download internal" href="_downloads/0_0_data.html"><tt class="xref download docutils literal"><span class="pre">Ann</span> <span class="pre">Arbor,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">1</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/0_1_data.html"><tt class="xref download docutils literal"><span class="pre">Ann</span> <span class="pre">Arbor,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">2</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/0_2_data.html"><tt class="xref download docutils literal"><span class="pre">Ann</span> <span class="pre">Arbor,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">3</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/0_3_data.html"><tt class="xref download docutils literal"><span class="pre">Ann</span> <span class="pre">Arbor,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">4</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/0_4_data.html"><tt class="xref download docutils literal"><span class="pre">Ann</span> <span class="pre">Arbor,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">5</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/0_5_data.html"><tt class="xref download docutils literal"><span class="pre">Ann</span> <span class="pre">Arbor,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">6</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/0_all_data.html"><tt class="xref download docutils literal"><span class="pre">Ann</span> <span class="pre">Arbor,</span> <span class="pre">all</span> <span class="pre">design</span> <span class="pre">points</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/1_0_data.html"><tt class="xref download docutils literal"><span class="pre">McMurdo</span> <span class="pre">Station,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">1</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/1_1_data.html"><tt class="xref download docutils literal"><span class="pre">McMurdo</span> <span class="pre">Station,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">2</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/1_2_data.html"><tt class="xref download docutils literal"><span class="pre">McMurdo</span> <span class="pre">Station,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">3</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/1_3_data.html"><tt class="xref download docutils literal"><span class="pre">McMurdo</span> <span class="pre">Station,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">4</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/1_4_data.html"><tt class="xref download docutils literal"><span class="pre">McMurdo</span> <span class="pre">Station,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">5</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/1_5_data.html"><tt class="xref download docutils literal"><span class="pre">McMurdo</span> <span class="pre">Station,</span> <span class="pre">design</span> <span class="pre">point</span> <span class="pre">6</span></tt></a></li>
+<li><a class="reference download internal" href="_downloads/1_all_data.html"><tt class="xref download docutils literal"><span class="pre">McMurdo</span> <span class="pre">Station,</span> <span class="pre">all</span> <span class="pre">design</span> <span class="pre">points</span></tt></a></li>
+</ul>
+<a class="reference internal image-reference" href="_images/0_0.png"><img alt="_images/0_0.png" src="_images/0_0.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/0_1.png"><img alt="_images/0_1.png" src="_images/0_1.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/0_2.png"><img alt="_images/0_2.png" src="_images/0_2.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/0_3.png"><img alt="_images/0_3.png" src="_images/0_3.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/0_4.png"><img alt="_images/0_4.png" src="_images/0_4.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/0_5.png"><img alt="_images/0_5.png" src="_images/0_5.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/0_all.png"><img alt="_images/0_all.png" src="_images/0_all.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/1_0.png"><img alt="_images/1_0.png" src="_images/1_0.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/1_1.png"><img alt="_images/1_1.png" src="_images/1_1.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/1_2.png"><img alt="_images/1_2.png" src="_images/1_2.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/1_3.png"><img alt="_images/1_3.png" src="_images/1_3.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/1_4.png"><img alt="_images/1_4.png" src="_images/1_4.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/1_5.png"><img alt="_images/1_5.png" src="_images/1_5.png" style="width: 0px;" /></a>
+<a class="reference internal image-reference" href="_images/1_all.png"><img alt="_images/1_all.png" src="_images/1_all.png" style="width: 0px;" /></a>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Running the Full CADRE Problem</a></li>
+<li><a class="reference internal" href="#interactive-visualization-of-results">Interactive Visualization of Results</a></li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="roll.html"
+                        title="previous chapter">Example: Optimization of the CADRE Roll Angle</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="srcdocs.html"
+                        title="next chapter">Source Documentation</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/full.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="srcdocs.html" title="Source Documentation"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="roll.html" title="Example: Optimization of the CADRE Roll Angle"
+             >previous</a> |</li>
+        <li><a href="index.html">CADRE 0.4 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

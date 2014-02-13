@@ -1,0 +1,306 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.thermal_temperature &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.thermal_temperature</h1><div class="highlight"><pre>
+<span class="sd">&#39;&#39;&#39; Thermal discipline for CADRE &#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.lib.datatypes.api</span> <span class="kn">import</span> <span class="n">Array</span>
+
+<span class="kn">from</span> <span class="nn">CADRE.rk4</span> <span class="kn">import</span> <span class="n">RK4</span>
+
+<span class="c"># Allow non-standard variable names for scientific calc</span>
+<span class="c"># pylint: disable-msg=C0103</span>
+
+<span class="c">#constants</span>
+<span class="n">m_f</span> <span class="o">=</span> <span class="mf">0.4</span>
+<span class="n">m_b</span> <span class="o">=</span> <span class="mf">2.0</span>
+<span class="n">cp_f</span> <span class="o">=</span> <span class="mf">0.6e3</span>
+<span class="n">cp_b</span> <span class="o">=</span> <span class="mf">2.0e3</span>
+<span class="n">A_T</span> <span class="o">=</span> <span class="mf">2.66e-3</span>
+
+<span class="n">alpha_c</span> <span class="o">=</span> <span class="mf">0.9</span>
+<span class="n">alpha_r</span> <span class="o">=</span> <span class="mf">0.2</span>
+<span class="n">eps_c</span> <span class="o">=</span> <span class="mf">0.87</span>
+<span class="n">eps_r</span> <span class="o">=</span> <span class="mf">0.88</span>
+
+<span class="n">q_sol</span> <span class="o">=</span> <span class="mf">1360.0</span>
+<span class="n">K</span> <span class="o">=</span> <span class="mf">5.67051e-8</span>
+
+<div class="viewcode-block" id="ThermalTemperature"><a class="viewcode-back" href="../../srcdocs.html#CADRE.thermal_temperature.ThermalTemperature">[docs]</a><span class="k">class</span> <span class="nc">ThermalTemperature</span><span class="p">(</span><span class="n">RK4</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Calculates the temperature distribution on the solar panels.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_times</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">ThermalTemperature</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">__init__</span><span class="p">()</span>
+
+        <span class="c"># Inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;T0&quot;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="mf">273.</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">5</span><span class="p">,)),</span>
+                             <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,),</span>
+                             <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                             <span class="n">units</span><span class="o">=</span><span class="s">&quot;degK&quot;</span><span class="p">,</span>
+                             <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                             <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Initial temperatures for the 4 fins and body&quot;</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;exposedArea&quot;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="n">n_times</span><span class="p">)),</span>
+                                      <span class="n">units</span><span class="o">=</span><span class="s">&quot;m**2&quot;</span><span class="p">,</span>
+                                      <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span> <span class="p">,</span><span class="n">n_times</span><span class="p">),</span>
+                                      <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                      <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                                      <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Exposed area to the sun for each solar cell over time&quot;</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;cellInstd&quot;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">)),</span>
+                                    <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">),</span>
+                                    <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                    <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                                    <span class="n">units</span><span class="o">=</span><span class="s">&#39;unitless&#39;</span><span class="p">,</span>
+                                    <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Cell/Radiator indication&quot;</span><span class="p">,</span>
+                                    <span class="n">low</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                                    <span class="n">high</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;LOS&quot;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_times</span><span class="p">,</span> <span class="p">)),</span>
+                              <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n_times</span><span class="p">,</span> <span class="p">),</span>
+                              <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                              <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                              <span class="n">units</span><span class="o">=</span><span class="s">&#39;unitless&#39;</span><span class="p">,</span>
+                              <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Satellite to Sun line of sight over time&quot;</span><span class="p">,</span>
+                              <span class="n">low</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                              <span class="n">high</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;P_comm&quot;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">n_times</span><span class="p">,</span> <span class="p">)),</span>
+                                 <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">n_times</span><span class="p">,</span> <span class="p">),</span>
+                                 <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                 <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;in&quot;</span><span class="p">,</span>
+                                 <span class="n">units</span><span class="o">=</span><span class="s">&#39;W&#39;</span><span class="p">,</span>
+                                 <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Communication power over time&quot;</span><span class="p">,</span>
+                                 <span class="n">low</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                                 <span class="n">high</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="c"># Outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&quot;temperature&quot;</span><span class="p">,</span> <span class="n">Array</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="n">n_times</span><span class="p">)),</span>
+                                      <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">n_times</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
+                                      <span class="n">units</span><span class="o">=</span><span class="s">&quot;degK&quot;</span><span class="p">,</span>
+                                      <span class="n">iotype</span><span class="o">=</span><span class="s">&quot;out&quot;</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s">&quot;Temperature for the 4 fins and body over time.&quot;</span><span class="p">,</span>
+                                      <span class="n">low</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mi">400</span><span class="p">)</span>
+                 <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">state_var</span> <span class="o">=</span> <span class="s">&quot;temperature&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">init_state_var</span> <span class="o">=</span> <span class="s">&quot;T0&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">external_vars</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;exposedArea&quot;</span><span class="p">,</span> <span class="s">&quot;LOS&quot;</span><span class="p">,</span> <span class="s">&quot;P_comm&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fixed_external_vars</span> <span class="o">=</span> <span class="p">[</span><span class="s">&quot;cellInstd&quot;</span><span class="p">,]</span>
+
+        <span class="c"># implementation of fixTemps from Thermal_Temperature.f90</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_times</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">temperature</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">T0</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">temperature</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">temperature</span><span class="p">[</span><span class="n">k</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.</span>
+
+<div class="viewcode-block" id="ThermalTemperature.list_deriv_vars"><a class="viewcode-back" href="../../srcdocs.html#CADRE.thermal_temperature.ThermalTemperature.list_deriv_vars">[docs]</a>    <span class="k">def</span> <span class="nf">list_deriv_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">input_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;T0&#39;</span><span class="p">,</span> <span class="s">&#39;exposedArea&#39;</span><span class="p">,</span> <span class="s">&#39;LOS&#39;</span><span class="p">,</span> <span class="s">&#39;P_comm&#39;</span><span class="p">,</span><span class="s">&#39;cellInstd&#39;</span><span class="p">,</span> <span class="p">)</span>
+        <span class="n">output_keys</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;temperature&#39;</span><span class="p">,</span> <span class="p">)</span>
+        <span class="k">return</span> <span class="n">input_keys</span><span class="p">,</span> <span class="n">output_keys</span>
+</div>
+<div class="viewcode-block" id="ThermalTemperature.f_dot"><a class="viewcode-back" href="../../srcdocs.html#CADRE.thermal_temperature.ThermalTemperature.f_dot">[docs]</a>    <span class="k">def</span> <span class="nf">f_dot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+
+        <span class="c"># revised implementation from ThermalTemperature.f90</span>
+        <span class="n">exposedArea</span> <span class="o">=</span> <span class="n">external</span><span class="p">[:</span><span class="mi">84</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+        <span class="n">LOS</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">84</span><span class="p">]</span>
+        <span class="n">P_comm</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">85</span><span class="p">]</span>
+        <span class="n">cellInstd</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">86</span><span class="p">:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+
+        <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="p">))</span>
+
+        <span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha_c</span><span class="o">*</span><span class="n">cellInstd</span> <span class="o">+</span> <span class="n">alpha_r</span> <span class="o">-</span> <span class="n">alpha_r</span><span class="o">*</span><span class="n">cellInstd</span>
+        <span class="n">eps</span> <span class="o">=</span> <span class="n">eps_c</span><span class="o">*</span><span class="n">cellInstd</span> <span class="o">+</span> <span class="n">eps_r</span> <span class="o">-</span> <span class="n">eps_r</span><span class="o">*</span><span class="n">cellInstd</span>
+
+        <span class="c"># Panels</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">12</span><span class="p">):</span>
+
+            <span class="c"># Body</span>
+            <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">4</span><span class="p">:</span>
+                <span class="n">f_i</span> <span class="o">=</span> <span class="mi">4</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">m_b</span>
+                <span class="n">cp</span> <span class="o">=</span> <span class="n">cp_b</span>
+
+            <span class="c"># Fin</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">f_i</span> <span class="o">=</span> <span class="p">(</span><span class="n">p</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">%</span><span class="mi">4</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">m_f</span>
+                <span class="n">cp</span> <span class="o">=</span> <span class="n">cp_f</span>
+
+            <span class="c"># Cells</span>
+            <span class="n">fact1</span> <span class="o">=</span> <span class="n">q_sol</span><span class="o">*</span><span class="n">LOS</span><span class="o">/</span><span class="p">(</span><span class="n">m</span><span class="o">*</span><span class="n">cp</span><span class="p">)</span>
+            <span class="n">fact2</span> <span class="o">=</span> <span class="n">K</span><span class="o">*</span><span class="n">A_T</span><span class="o">*</span><span class="n">state</span><span class="p">[</span><span class="n">f_i</span><span class="p">]</span><span class="o">**</span><span class="mi">4</span><span class="o">/</span><span class="p">(</span><span class="n">m</span><span class="o">*</span><span class="n">cp</span><span class="p">)</span>
+            <span class="n">f</span><span class="p">[</span><span class="n">f_i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="n">exposedArea</span><span class="p">[:,</span> <span class="n">p</span><span class="p">])</span> <span class="o">*</span> <span class="n">fact1</span>
+            <span class="n">f</span><span class="p">[</span><span class="n">f_i</span><span class="p">]</span> <span class="o">-=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">eps</span><span class="p">[:,</span> <span class="n">p</span><span class="p">])</span> <span class="o">*</span> <span class="n">fact2</span>
+
+        <span class="n">f</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">4.0</span> <span class="o">*</span> <span class="n">P_comm</span> <span class="o">/</span> <span class="n">m_b</span> <span class="o">/</span> <span class="n">cp_b</span>
+
+        <span class="k">return</span> <span class="n">f</span>
+
+</div>
+<div class="viewcode-block" id="ThermalTemperature.df_dy"><a class="viewcode-back" href="../../srcdocs.html#CADRE.thermal_temperature.ThermalTemperature.df_dy">[docs]</a>    <span class="k">def</span> <span class="nf">df_dy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+
+        <span class="c"># revised implementation from ThermalTemperature.f90</span>
+        <span class="n">cellInstd</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">86</span><span class="p">:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+        <span class="n">eps</span> <span class="o">=</span> <span class="n">eps_c</span><span class="o">*</span><span class="n">cellInstd</span> <span class="o">+</span> <span class="n">eps_r</span> <span class="o">-</span> <span class="n">eps_r</span><span class="o">*</span><span class="n">cellInstd</span>
+
+        <span class="n">dfdy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+        <span class="c"># Panels</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">12</span><span class="p">):</span>
+
+            <span class="c"># Body</span>
+            <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">4</span><span class="p">:</span>
+                <span class="n">f_i</span> <span class="o">=</span> <span class="mi">4</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">m_b</span>
+                <span class="n">cp</span> <span class="o">=</span> <span class="n">cp_b</span>
+
+            <span class="c"># Fin</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">f_i</span> <span class="o">=</span> <span class="p">(</span><span class="n">p</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">%</span><span class="mi">4</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">m_f</span>
+                <span class="n">cp</span> <span class="o">=</span> <span class="n">cp_f</span>
+
+            <span class="c"># Cells</span>
+            <span class="n">fact</span> <span class="o">=</span> <span class="mf">4.0</span><span class="o">*</span><span class="n">K</span><span class="o">*</span><span class="n">A_T</span><span class="o">*</span><span class="n">state</span><span class="p">[</span><span class="n">f_i</span><span class="p">]</span><span class="o">**</span><span class="mi">3</span><span class="o">/</span><span class="p">(</span><span class="n">m</span><span class="o">*</span><span class="n">cp</span><span class="p">)</span>
+            <span class="n">dfdy</span><span class="p">[</span><span class="n">f_i</span><span class="p">,</span> <span class="n">f_i</span><span class="p">]</span> <span class="o">-=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">eps</span><span class="p">)</span> <span class="o">*</span> <span class="n">fact</span>
+
+        <span class="k">return</span> <span class="n">dfdy</span>
+</div>
+<div class="viewcode-block" id="ThermalTemperature.df_dx"><a class="viewcode-back" href="../../srcdocs.html#CADRE.thermal_temperature.ThermalTemperature.df_dx">[docs]</a>    <span class="k">def</span> <span class="nf">df_dx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">external</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+
+        <span class="c"># revised implementation from ThermalTemperature.f90</span>
+        <span class="n">exposedArea</span> <span class="o">=</span> <span class="n">external</span><span class="p">[:</span><span class="mi">84</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+        <span class="n">LOS</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">84</span><span class="p">]</span>
+        <span class="n">cellInstd</span> <span class="o">=</span> <span class="n">external</span><span class="p">[</span><span class="mi">86</span><span class="p">:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+
+        <span class="n">dfdx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="mi">170</span><span class="p">))</span>
+        <span class="n">alpha</span> <span class="o">=</span> <span class="n">alpha_c</span><span class="o">*</span><span class="n">cellInstd</span> <span class="o">+</span> <span class="n">alpha_r</span> <span class="o">-</span> <span class="n">alpha_r</span><span class="o">*</span><span class="n">cellInstd</span>
+        <span class="n">dalpha_dw</span> <span class="o">=</span> <span class="n">alpha_c</span> <span class="o">-</span> <span class="n">alpha_r</span>
+        <span class="n">deps_dw</span> <span class="o">=</span> <span class="n">eps_c</span> <span class="o">-</span> <span class="n">eps_r</span>
+
+        <span class="c"># Panels</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">12</span><span class="p">):</span>
+
+            <span class="c"># Body</span>
+            <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="mi">4</span><span class="p">:</span>
+                <span class="n">f_i</span> <span class="o">=</span> <span class="mi">4</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">m_b</span>
+                <span class="n">cp</span> <span class="o">=</span> <span class="n">cp_b</span>
+
+            <span class="c"># Fin</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">f_i</span> <span class="o">=</span> <span class="p">(</span><span class="n">p</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">%</span><span class="mi">4</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">m_f</span>
+                <span class="n">cp</span> <span class="o">=</span> <span class="n">cp_f</span>
+
+            <span class="c"># Cells</span>
+            <span class="n">fact3</span> <span class="o">=</span> <span class="n">q_sol</span><span class="o">/</span><span class="p">(</span><span class="n">m</span><span class="o">*</span><span class="n">cp</span><span class="p">)</span>
+            <span class="n">fact1</span> <span class="o">=</span> <span class="n">fact3</span><span class="o">*</span><span class="n">LOS</span>
+            <span class="n">fact2</span> <span class="o">=</span> <span class="n">K</span><span class="o">*</span><span class="n">A_T</span><span class="o">*</span><span class="n">state</span><span class="p">[</span><span class="n">f_i</span><span class="p">]</span><span class="o">**</span><span class="mi">4</span><span class="o">/</span><span class="p">(</span><span class="n">m</span><span class="o">*</span><span class="n">cp</span><span class="p">)</span>
+
+            <span class="n">dfdx</span><span class="p">[</span><span class="n">f_i</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span><span class="n">p</span><span class="o">+</span><span class="mi">84</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">+=</span> <span class="n">alpha</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="n">fact1</span>
+            <span class="n">dfdx</span><span class="p">[</span><span class="n">f_i</span><span class="p">,</span> <span class="n">p</span><span class="o">+</span><span class="mi">86</span><span class="p">:</span><span class="n">p</span><span class="o">+</span><span class="mi">170</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">+=</span> <span class="n">dalpha_dw</span> <span class="o">*</span> <span class="n">exposedArea</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="n">fact1</span> <span class="o">-</span> \
+                <span class="n">deps_dw</span> <span class="o">*</span> <span class="n">fact2</span>
+            <span class="n">dfdx</span><span class="p">[</span><span class="n">f_i</span><span class="p">,</span> <span class="mi">84</span><span class="p">]</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span> <span class="o">*</span> <span class="n">exposedArea</span><span class="p">[:,</span> <span class="n">p</span><span class="p">])</span> <span class="o">*</span> <span class="n">fact3</span>
+
+        <span class="n">dfdx</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">85</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">4.0</span> <span class="o">/</span> <span class="n">m_b</span> <span class="o">/</span> <span class="n">cp_b</span>
+
+        <span class="k">return</span> <span class="n">dfdx</span>
+</pre></div></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>

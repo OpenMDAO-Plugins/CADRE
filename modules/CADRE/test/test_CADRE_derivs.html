@@ -1,0 +1,189 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>CADRE.test.test_CADRE_derivs &mdash; CADRE 0.4 documentation</title>
+    
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.4',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="CADRE 0.4 documentation" href="../../../index.html" />
+    <link rel="up" title="Module code" href="../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for CADRE.test.test_CADRE_derivs</h1><div class="highlight"><pre>
+<span class="kn">import</span> <span class="nn">unittest</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">openmdao.main.api</span> <span class="kn">import</span> <span class="n">Assembly</span><span class="p">,</span> <span class="n">set_as_top</span><span class="p">,</span> <span class="n">Driver</span>
+<span class="kn">from</span> <span class="nn">openmdao.util.testutil</span> <span class="kn">import</span> <span class="n">assert_rel_error</span>
+<span class="kn">from</span> <span class="nn">CADRE.CADRE_assembly</span> <span class="kn">import</span> <span class="n">CADRE</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="k">class</span> <span class="nc">Testcase_CADRE_deriv</span><span class="p">(</span><span class="n">unittest</span><span class="o">.</span><span class="n">TestCase</span><span class="p">):</span>
+<div class="viewcode-block" id="Testcase_CADRE_deriv"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_CADRE_derivs.Testcase_CADRE_deriv">[docs]</a>
+    <span class="sd">&quot;&quot;&quot; Test run/step/stop aspects of a simple workflow. &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">test_RK4_issue</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Testcase_CADRE_deriv.test_RK4_issue"><a class="viewcode-back" href="../../../srcdocs.html#CADRE.test.test_CADRE_derivs.Testcase_CADRE_deriv.test_RK4_issue">[docs]</a>
+        <span class="n">n</span> <span class="o">=</span> <span class="mi">60</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="mi">20</span>
+
+        <span class="n">LDs</span> <span class="o">=</span> <span class="p">[</span><span class="mf">5233.5</span><span class="p">,</span> <span class="mf">5294.5</span><span class="p">,</span> <span class="mf">5356.5</span><span class="p">,</span> <span class="mf">5417.5</span><span class="p">,</span> <span class="mf">5478.5</span><span class="p">,</span> <span class="mf">5537.5</span><span class="p">]</span>
+
+        <span class="n">r_e2b_I0s</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">4505.29362</span><span class="p">,</span> <span class="o">-</span><span class="mf">3402.16069</span><span class="p">,</span> <span class="o">-</span><span class="mf">3943.74582</span><span class="p">,</span>
+                               <span class="mf">4.1923899</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.56280012</span><span class="p">,</span>  <span class="mf">6.14347427</span><span class="p">]),</span>
+                     <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                         <span class="p">[</span><span class="o">-</span><span class="mf">1005.46693</span><span class="p">,</span>  <span class="o">-</span><span class="mf">597.205348</span><span class="p">,</span> <span class="o">-</span><span class="mf">6772.86532</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.61047858</span><span class="p">,</span>
+                          <span class="o">-</span><span class="mf">7.54623146</span><span class="p">,</span>  <span class="mf">0.75907455</span><span class="p">]),</span>
+                     <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                         <span class="p">[</span><span class="mf">4401.10539</span><span class="p">,</span>  <span class="mf">2275.95053</span><span class="p">,</span> <span class="o">-</span><span class="mf">4784.13188</span><span class="p">,</span> <span class="o">-</span><span class="mf">5.26605537</span><span class="p">,</span>
+                          <span class="o">-</span><span class="mf">1.08194926</span><span class="p">,</span> <span class="o">-</span><span class="mf">5.37013745</span><span class="p">]),</span>
+                     <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                         <span class="p">[</span><span class="o">-</span><span class="mf">4969.91222</span><span class="p">,</span>  <span class="mf">4624.84149</span><span class="p">,</span>  <span class="mf">1135.9414</span><span class="p">,</span>  <span class="mf">0.1874654</span><span class="p">,</span>
+                          <span class="o">-</span><span class="mf">1.62801666</span><span class="p">,</span>  <span class="mf">7.4302362</span><span class="p">]),</span>
+                     <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                         <span class="p">[</span><span class="o">-</span><span class="mf">235.021232</span><span class="p">,</span>  <span class="mf">2195.72976</span><span class="p">,</span>  <span class="mf">6499.79919</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.55956031</span><span class="p">,</span>
+                          <span class="o">-</span><span class="mf">6.82743519</span><span class="p">,</span>  <span class="mf">2.21628099</span><span class="p">]),</span>
+                     <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                         <span class="p">[</span><span class="o">-</span><span class="mf">690.314375</span><span class="p">,</span> <span class="o">-</span><span class="mf">1081.78239</span><span class="p">,</span> <span class="o">-</span><span class="mf">6762.90367</span><span class="p">,</span>  <span class="mf">7.44316722</span><span class="p">,</span>
+                          <span class="mf">1.19745345</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.96035904</span><span class="p">])]</span>
+
+        <span class="n">top</span> <span class="o">=</span> <span class="n">set_as_top</span><span class="p">(</span><span class="n">Assembly</span><span class="p">())</span>
+        <span class="n">top</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;pt&#39;</span><span class="p">,</span> <span class="n">CADRE</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">m</span><span class="p">))</span>
+
+        <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="n">top</span><span class="o">.</span><span class="n">pt</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;LD&quot;</span><span class="p">,</span> <span class="n">LDs</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="n">top</span><span class="o">.</span><span class="n">pt</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;r_e2b_I0&quot;</span><span class="p">,</span> <span class="n">r_e2b_I0s</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+
+        <span class="n">top</span><span class="o">.</span><span class="n">pt</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+        <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;BsplineParameters.CP_gamma&#39;</span><span class="p">]</span>
+        <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;Comm_DataDownloaded.Data&#39;</span><span class="p">]</span>
+
+        <span class="n">J1</span> <span class="o">=</span> <span class="n">top</span><span class="o">.</span><span class="n">pt</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">calc_gradient</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;forward&#39;</span><span class="p">)</span>
+
+        <span class="c">#nn = len(top.pt.driver.workflow.res)</span>
+        <span class="c">#J = np.zeros([nn, nn])</span>
+        <span class="c">#arg = np.zeros((nn, ))</span>
+        <span class="c">#for j in range(nn):</span>
+            <span class="c">#arg[j] = 1.0</span>
+            <span class="c">#J[:, j] = top.pt.driver.workflow.matvecFWD(arg)</span>
+            <span class="c">#arg[j] = 0.0</span>
+            
+        <span class="n">top</span><span class="o">.</span><span class="n">pt</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">config_changed</span><span class="p">()</span>
+        <span class="n">J2</span> <span class="o">=</span> <span class="n">top</span><span class="o">.</span><span class="n">pt</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">calc_gradient</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;adjoint&#39;</span><span class="p">)</span>
+
+        <span class="c">#Jt = np.zeros([nn, nn])</span>
+        <span class="c">#for j in range(nn):</span>
+            <span class="c">#arg[j] = 1.0</span>
+            <span class="c">#Jt[:, j] = top.pt.driver.workflow.matvecREV(arg)</span>
+            <span class="c">#arg[j] = 0.0</span>
+        
+        <span class="c">#print J</span>
+        <span class="c">#print Jt.T</span>
+        <span class="c">#print J-Jt.T</span>
+        
+        <span class="n">top</span><span class="o">.</span><span class="n">pt</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">config_changed</span><span class="p">()</span>
+        <span class="n">Jfd</span> <span class="o">=</span> <span class="n">top</span><span class="o">.</span><span class="n">pt</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">workflow</span><span class="o">.</span><span class="n">calc_gradient</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">outputs</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">&#39;fd&#39;</span><span class="p">)</span>
+
+        <span class="n">np</span><span class="o">.</span><span class="n">set_printoptions</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="s">&#39;nan&#39;</span><span class="p">)</span>
+        <span class="c">#print np.nonzero(J1)</span>
+        <span class="c">#print np.nonzero(J2)</span>
+        <span class="c">#print np.nonzero(Jfd)</span>
+        <span class="c">#print J1</span>
+        <span class="c">#print J2</span>
+        <span class="c">#print Jfd</span>
+        <span class="k">print</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">J1</span><span class="o">-</span><span class="n">Jfd</span><span class="p">)</span>
+        <span class="k">print</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">J2</span><span class="o">-</span><span class="n">Jfd</span><span class="p">)</span>
+        <span class="k">print</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">J1</span><span class="o">-</span><span class="n">J2</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">J1</span><span class="o">-</span><span class="n">J2</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1.0e-6</span> <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">J1</span><span class="o">-</span><span class="n">Jfd</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1.0e-4</span> <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertTrue</span><span class="p">(</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">J2</span><span class="o">-</span><span class="n">Jfd</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1.0e-4</span> <span class="p">)</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&quot;__main__&quot;</span><span class="p">:</span></div></div>
+
+    <span class="n">unittest</span><span class="o">.</span><span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">CADRE 0.4 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright .
+      Last updated on Feb 12, 2014.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.
+    </div>
+  </body>
+</html>
