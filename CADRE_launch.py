@@ -7,8 +7,8 @@ from openmdao.lib.drivers.api import SLSQPdriver
 
 from openmdao.main.datatypes.api import Float, Array, Int
 
-from comm import Comm_EarthsSpin, Comm_EarthsSpinMtx
-from orbit import Orbit_Initial, Orbit_Dynamics
+from CADRE import Comm_EarthsSpin, Comm_EarthsSpinMtx
+from CADRE import Orbit_Initial, Orbit_Dynamics
 from scipy.stats import kurtosis, moment
 
 
@@ -23,20 +23,22 @@ class Uniformity(Component):
     def execute(self):
         self.k  = max(self.sample) - min(self.sample)
 
-    def linearize(self):
-        self.J = np.zeros((1,self.n))
-        idx_max = np.where(self.sample == max(self.sample))
-        idx_min = np.where(self.sample == min(self.sample))
-        self.J[0,idx_max] = 1
-        self.J[0,idx_min] = -1
+    #def list_deriv_vars(self):
+        #"""Provide full Jacobian."""
 
-    def provideJ(self):
-        """Provide full Jacobian."""
+        #input_keys = ('sample',)
+        #output_keys = ('k',)
 
-        input_keys = ('sample',)
-        output_keys = ('k',)
+        #return input_keys, output_keys
 
-        return input_keys, output_keys, self.J
+    #def provideJ(self):
+        #self.J = np.zeros((1,self.n))
+        #idx_max = np.where(self.sample == max(self.sample))
+        #idx_min = np.where(self.sample == min(self.sample))
+        #self.J[0,idx_max] = 1
+        #self.J[0,idx_min] = -1
+
+        #return self.J
 
 
 class GroundLOC(Component):
@@ -56,7 +58,15 @@ class GroundLOC(Component):
         self.add('lats', Array(np.zeros(self.n), iotype='out'))
         self.add('lons', Array(np.zeros(self.n), iotype='out'))
 
-    def linearize(self):
+    def list_deriv_vars(self):
+        """Provide full Jacobian."""
+
+        input_keys = ('r_e2b_I', 'O_IE')
+        output_keys = ('lats', 'lons')
+
+        return input_keys, output_keys
+
+    def provideJ(self):
         self.J = np.zeros((self.n, 2, 3))
         self.J_O_IE = np.zeros((self.n, 2, 3, 3))
 
@@ -209,9 +219,9 @@ if __name__ == "__main__":
     print "with OpenMDAO optimizer:"
     a = CADRE_Launch(10)
     a.Orbit_Initial.Inc = 15
-    a.add('driver', SLSQPdriver())
-    #a.add('driver', CONMINdriver())
-    #a.driver.conmin_diff = True
+    #a.add('driver', SLSQPdriver())
+    a.add('driver', CONMINdriver())
+    a.driver.conmin_diff = True
     a.driver.add_objective("-Lat_uniform.k - Lon_uniform.k")
     a.driver.add_parameter(
         ["Orbit_Initial.altPerigee", "Orbit_Initial.altApogee"],
@@ -229,8 +239,8 @@ if __name__ == "__main__":
 
     # hey ken!
     # a.driver.workflow.check_gradient(inputs=['Orbit_Dynamics.r_e2b_I0[:3]'], outputs=[ "Orbit_Dynamics.r_e2b_I[:3,:]"])
-    a.driver.workflow.check_gradient(inputs=['Orbit_Dynamics.r_e2b_I0[:3]'], outputs=[ "Orbit_Dynamics.r_e2b_I[:3,:]"])
-    exit()
+    # exit()
+
     l1, l2 = a.GroundLOC.lats, a.GroundLOC.lons
     print "min/max lats:", min(l1), max(l1)
     print "min/max lons:", min(l2), max(l2)
@@ -243,31 +253,31 @@ if __name__ == "__main__":
     print "Elapsed time: ", time.time() - tt, "seconds"
     print 30 * "-"
 
-    # print "without OpenMDAO optimizer:"
-    # a = CADRE_Launch()
-    # a.Orbit_Initial.Inc = 10.
-    # tt = time.time()
+    #print "without OpenMDAO optimizer:"
+    #a = CADRE_Launch()
+    #a.Orbit_Initial.Inc = 10.
+    #tt = time.time()
 
-    # def f(orbit):
-    #     a.Orbit_Initial.altPerigee = orbit[0]
-    #     a.Orbit_Initial.altApogee = orbit[0]
-    #     a.Orbit_Initial.RAAN = orbit[1]
-    #     a.Orbit_Initial.Inc = orbit[2]
-    #     a.run()
-    #     return a.Lat_uniform.k + a.Lon_uniform.k
+    #def f(orbit):
+        #a.Orbit_Initial.altPerigee = orbit[0]
+        #a.Orbit_Initial.altApogee = orbit[0]
+        #a.Orbit_Initial.RAAN = orbit[1]
+        #a.Orbit_Initial.Inc = orbit[2]
+        #a.run()
+        #return a.Lat_uniform.k + a.Lon_uniform.k
 
-    # #start_point = [600, 0, 45]
-    # start_point = [500, 66, 25]
-    # fmin_slsqp(f, start_point, bounds=[
-    #            (500, 1000), (-180, 180), (0, 90)],
-    #            iprint=1)
-    # l1, l2 = a.GroundLOC.lats, a.GroundLOC.lons
-    # print "min/max lats:", min(l1), max(l1)
-    # print "min/max lons:", min(l2), max(l2)
-    # print "objective:", a.Lat_uniform.k + a.Lon_uniform.k
-    # print(a.Orbit_Initial.altPerigee,
-    #       a.Orbit_Initial.altApogee,
-    #       a.Orbit_Initial.RAAN,
-    #       a.Orbit_Initial.Inc,
-    #       a.Orbit_Initial.argPerigee)
-    # print "Elapsed time: ", time.time() - tt, "seconds"
+    ##start_point = [600, 0, 45]
+    #start_point = [500, 66, 25]
+    #fmin_slsqp(f, start_point, bounds=[
+               #(500, 1000), (-180, 180), (0, 90)],
+               #iprint=1)
+    #l1, l2 = a.GroundLOC.lats, a.GroundLOC.lons
+    #print "min/max lats:", min(l1), max(l1)
+    #print "min/max lons:", min(l2), max(l2)
+    #print "objective:", a.Lat_uniform.k + a.Lon_uniform.k
+    #print(a.Orbit_Initial.altPerigee,
+          #a.Orbit_Initial.altApogee,
+          #a.Orbit_Initial.RAAN,
+          #a.Orbit_Initial.Inc,
+          #a.Orbit_Initial.argPerigee)
+    #print "Elapsed time: ", time.time() - tt, "seconds"

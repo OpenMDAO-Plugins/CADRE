@@ -1,5 +1,5 @@
-from .CADRE_mdp import CADRE_Optimization
-from .CADRE_assembly import CADRE, Attitude_Angular, Attitude_AngularRates, \
+#from .CADRE_mdp import CADRE_Optimization
+from CADRE_assembly import CADRE, Attitude_Angular, Attitude_AngularRates, \
     Attitude_Attitude, Attitude_Roll, Attitude_RotationMtx, \
     Attitude_RotationMtxRates, Attitude_Sideslip, Attitude_Torque, \
     BatteryConstraints, BatteryPower, BatterySOC, BsplineParameters, \

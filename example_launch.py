@@ -3,8 +3,8 @@ from openmdao.main.api import Assembly, Component
 from openmdao.lib.drivers.api import SLSQPdriver
 from openmdao.main.datatypes.api import Float, Array, Int
 
-from CADRE import Comm_EarthsSpin, Comm_EarthsSpinMtx
-from CADRE import Orbit_Initial, Orbit_Dynamics
+from CADRE.comm import Comm_EarthsSpin, Comm_EarthsSpinMtx
+from CADRE.orbit import Orbit_Initial, Orbit_Dynamics
 
 
 class Uniformity(Component):

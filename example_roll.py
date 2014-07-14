@@ -1,6 +1,6 @@
 from openmdao.main.api import Component
 from openmdao.main.datatypes.api import Float, Array
-from CADRE import CADRE
+from CADRE.CADRE_assembly import CADRE
 from openmdao.lib.drivers.api import SLSQPdriver
 import os
 import pylab

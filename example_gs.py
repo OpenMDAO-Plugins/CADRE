@@ -1,7 +1,7 @@
 from openmdao.lib.casehandlers.api import CSVCaseRecorder
 from openmdao.main.api import Component
 from openmdao.main.datatypes.api import Float
-from CADRE.CADRE_mdp import CADRE_Optimization
+from CADRE_mdp import CADRE_Optimization
 import urllib
 import json
 import numpy as np
@@ -53,7 +53,15 @@ class Elevation(Component):
         except:
             pass
 
-    def linearize(self):
+    def list_deriv_vars(self):
+        """Provide full Jacobian."""
+
+        input_keys = ('alt')
+        output_keys = ('lat', 'lon')
+
+        return input_keys, output_keys
+
+    def provideJ(self):
         pass
 
     def apply_deriv(self, arg, result):

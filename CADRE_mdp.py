@@ -11,7 +11,8 @@ except ImportError:
     warnings.warn(
         "pyopt_driver must be installed to run the full CADRE optimization",
         ImportWarning)
-from .CADRE_assembly import CADRE
+
+from CADRE.CADRE_assembly import CADRE
 
 
 class CADRE_Optimization(Assembly):
@@ -32,7 +33,7 @@ class CADRE_Optimization(Assembly):
 
         # Raw data to load
         fpath = os.path.dirname(os.path.realpath(__file__))
-        fpath = os.path.join(fpath, 'data')
+        fpath = os.path.join(fpath, 'src/CADRE/data')
         solar_raw1 = np.genfromtxt(fpath + '/Solar/Area10.txt')
         solar_raw2 = np.loadtxt(fpath + '/Solar/Area_all.txt')
         comm_rawGdata = np.genfromtxt(fpath + '/Comm/Gain.txt')

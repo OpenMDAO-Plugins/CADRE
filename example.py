@@ -1,5 +1,5 @@
 from openmdao.lib.casehandlers.api import CSVCaseRecorder
-from CADRE import CADRE_Optimization
+from CADRE_mdp import CADRE_Optimization
 
 print "setting up"
 top = CADRE_Optimization(n=1500, m=300)
