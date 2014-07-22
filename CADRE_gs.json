@@ -1,0 +1,252 @@
+{
+"__length_1": 4303
+, "simulation_info": {
+    "OpenMDAO_Version": "0.10.0", 
+    "constants": {}, 
+    "expressions": {
+        "-pt0.Data[0][-1]-pt1.Data[0][-1]-pt2.Data[0][-1]-pt3.Data[0][-1]-pt4.Data[0][-1]-pt5.Data[0][-1]": {
+            "data_type": "Objective", 
+            "pcomp_name": "_pseudo_30"
+        }, 
+        "pt0.ConCh <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_0"
+        }, 
+        "pt0.ConDs <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_1"
+        }, 
+        "pt0.ConS0 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_2"
+        }, 
+        "pt0.ConS1 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_3"
+        }, 
+        "pt0.SOC[0][0] = pt0.SOC[0][-1]": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_4"
+        }, 
+        "pt1.ConCh <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_5"
+        }, 
+        "pt1.ConDs <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_6"
+        }, 
+        "pt1.ConS0 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_7"
+        }, 
+        "pt1.ConS1 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_8"
+        }, 
+        "pt1.SOC[0][0] = pt1.SOC[0][-1]": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_9"
+        }, 
+        "pt2.ConCh <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_10"
+        }, 
+        "pt2.ConDs <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_11"
+        }, 
+        "pt2.ConS0 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_12"
+        }, 
+        "pt2.ConS1 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_13"
+        }, 
+        "pt2.SOC[0][0] = pt2.SOC[0][-1]": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_14"
+        }, 
+        "pt3.ConCh <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_15"
+        }, 
+        "pt3.ConDs <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_16"
+        }, 
+        "pt3.ConS0 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_17"
+        }, 
+        "pt3.ConS1 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_18"
+        }, 
+        "pt3.SOC[0][0] = pt3.SOC[0][-1]": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_19"
+        }, 
+        "pt4.ConCh <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_20"
+        }, 
+        "pt4.ConDs <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_21"
+        }, 
+        "pt4.ConS0 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_22"
+        }, 
+        "pt4.ConS1 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_23"
+        }, 
+        "pt4.SOC[0][0] = pt4.SOC[0][-1]": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_24"
+        }, 
+        "pt5.ConCh <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_25"
+        }, 
+        "pt5.ConDs <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_26"
+        }, 
+        "pt5.ConS0 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_27"
+        }, 
+        "pt5.ConS1 <= 0": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_28"
+        }, 
+        "pt5.SOC[0][0] = pt5.SOC[0][-1]": {
+            "data_type": "Constraint", 
+            "pcomp_name": "_pseudo_29"
+        }
+    }, 
+    "name": "", 
+    "uuid": "f824a70a-11e9-11e4-a513-20c9d0478eff", 
+    "variable_metadata": {
+        "Elevation.alt": {
+            "assumed_default": false, 
+            "descr": "Elevation", 
+            "high": null, 
+            "iotype": "out", 
+            "low": null, 
+            "units": "km", 
+            "vartypename": "Float"
+        }
+    }
+}
+, "__length_2": 3039
+, "driver_info_1": {
+    "_id": 4565982960, 
+    "eq_constraints": [
+        "pt0.SOC[0][0] = pt0.SOC[0][-1]", 
+        "pt1.SOC[0][0] = pt1.SOC[0][-1]", 
+        "pt2.SOC[0][0] = pt2.SOC[0][-1]", 
+        "pt3.SOC[0][0] = pt3.SOC[0][-1]", 
+        "pt4.SOC[0][0] = pt4.SOC[0][-1]", 
+        "pt5.SOC[0][0] = pt5.SOC[0][-1]"
+    ], 
+    "ineq_constraints": [
+        "pt0.ConCh <= 0", 
+        "pt0.ConDs <= 0", 
+        "pt0.ConS0 <= 0", 
+        "pt0.ConS1 <= 0", 
+        "pt1.ConCh <= 0", 
+        "pt1.ConDs <= 0", 
+        "pt1.ConS0 <= 0", 
+        "pt1.ConS1 <= 0", 
+        "pt2.ConCh <= 0", 
+        "pt2.ConDs <= 0", 
+        "pt2.ConS0 <= 0", 
+        "pt2.ConS1 <= 0", 
+        "pt3.ConCh <= 0", 
+        "pt3.ConDs <= 0", 
+        "pt3.ConS0 <= 0", 
+        "pt3.ConS1 <= 0", 
+        "pt4.ConCh <= 0", 
+        "pt4.ConDs <= 0", 
+        "pt4.ConS0 <= 0", 
+        "pt4.ConS1 <= 0", 
+        "pt5.ConCh <= 0", 
+        "pt5.ConDs <= 0", 
+        "pt5.ConS0 <= 0", 
+        "pt5.ConS1 <= 0"
+    ], 
+    "name": "driver", 
+    "objectives": [
+        "-pt0.Data[0][-1]-pt1.Data[0][-1]-pt2.Data[0][-1]-pt3.Data[0][-1]-pt4.Data[0][-1]-pt5.Data[0][-1]"
+    ], 
+    "parameters": [
+        "pt0.CP_Isetpt", 
+        "pt0.CP_gamma", 
+        "pt0.CP_P_comm", 
+        "pt0.iSOC[0]", 
+        "pt1.CP_Isetpt", 
+        "pt1.CP_gamma", 
+        "pt1.CP_P_comm", 
+        "pt1.iSOC[0]", 
+        "pt2.CP_Isetpt", 
+        "pt2.CP_gamma", 
+        "pt2.CP_P_comm", 
+        "pt2.iSOC[0]", 
+        "pt3.CP_Isetpt", 
+        "pt3.CP_gamma", 
+        "pt3.CP_P_comm", 
+        "pt3.iSOC[0]", 
+        "pt4.CP_Isetpt", 
+        "pt4.CP_gamma", 
+        "pt4.CP_P_comm", 
+        "pt4.iSOC[0]", 
+        "pt5.CP_Isetpt", 
+        "pt5.CP_gamma", 
+        "pt5.CP_P_comm", 
+        "pt5.iSOC[0]", 
+        "['pt0.cellInstd', 'pt1.cellInstd', 'pt2.cellInstd', 'pt3.cellInstd', 'pt4.cellInstd', 'pt5.cellInstd']", 
+        "['pt0.finAngle', 'pt1.finAngle', 'pt2.finAngle', 'pt3.finAngle', 'pt4.finAngle', 'pt5.finAngle']", 
+        "['pt0.antAngle', 'pt1.antAngle', 'pt2.antAngle', 'pt3.antAngle', 'pt4.antAngle', 'pt5.antAngle']", 
+        "['pt0.lon', 'pt1.lon', 'pt2.lon', 'pt3.lon', 'pt4.lon', 'pt5.lon', 'Elevation.lon']", 
+        "['pt0.lat', 'pt1.lat', 'pt2.lat', 'pt3.lat', 'pt4.lat', 'pt5.lat', 'Elevation.lat']"
+    ], 
+    "recording": [
+        "_pseudo_4", 
+        "_pseudo_9", 
+        "_pseudo_14", 
+        "_pseudo_19", 
+        "_pseudo_24", 
+        "_pseudo_29", 
+        "_pseudo_0", 
+        "_pseudo_1", 
+        "_pseudo_2", 
+        "_pseudo_3", 
+        "_pseudo_5", 
+        "_pseudo_6", 
+        "_pseudo_7", 
+        "_pseudo_8", 
+        "_pseudo_10", 
+        "_pseudo_11", 
+        "_pseudo_12", 
+        "_pseudo_13", 
+        "_pseudo_15", 
+        "_pseudo_16", 
+        "_pseudo_17", 
+        "_pseudo_18", 
+        "_pseudo_20", 
+        "_pseudo_21", 
+        "_pseudo_22", 
+        "_pseudo_23", 
+        "_pseudo_25", 
+        "_pseudo_26", 
+        "_pseudo_27", 
+        "_pseudo_28", 
+        "Elevation.alt"
+    ]
+}
+}
