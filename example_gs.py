@@ -89,10 +89,13 @@ lats = ["pt" + str(i) + ".lat" for i in xrange(6)] + ["Elevation.lat"]
 top.driver.add_parameter(lons, low=-180, high=180)
 top.driver.add_parameter(lats, low=-90, high=90)
 
-top.recorders = [JSONCaseRecorder('CADRE_gs.json')]
+top.recorders = [BSONCaseRecorder('CADRE_gs.bson')]
 includes = [ 'pt' + str(i) + '.Data' for i in range(6)]
 includes.extend( [ "_pseudo_" + str(i) for i in range(30) ] )
 includes.append( "Elevation.alt")
+includes.extend( [ 'pt' + str(i) + '.lat' for i in range(6)] )
+includes.extend( [ 'pt' + str(i) + '.lon' for i in range(6)] )
 top.includes = includes
+
 print "running"
 top.run()

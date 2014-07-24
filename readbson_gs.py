@@ -3,6 +3,15 @@ import numpy as np
 import pylab
 import webbrowser
 
+def get_constraint_value_from_case( cds, case, constraint_name ):
+    # can get at constraints using
+    #    cds.simulation_info[ 'expressions' ] to get the pseudos that 
+    #    have that value
+    #      cds.simulation_info[ 'expressions' ]['pt1.ConS0 <= 0']
+    #     equals
+    #      {u'pcomp_name': u'_pseudo_7', u'data_type': u'Constraint'}
+    return case[ cds.simulation_info[ 'expressions' ][constraint_name][ 'pcomp_name' ] ]
+
 cds = CaseDataset("CADRE_gs.bson", "bson")
 vnames = cds.data.var_names().fetch()
 cases = cds.data.driver("driver").fetch()
@@ -32,10 +41,10 @@ for case in cases:
 
     # print sumdata, sum(feasible), max(feasible) #,[ '%.1f' % i for i in
     # feasible]
-    print sumdata, case["pt0.lat[0]"], case["pt0.lon[0]"], case["Elevation.alt"]
+    print sumdata, case["pt0.lat"], case["pt0.lon"], case["Elevation.alt"]
 
 url = "https://maps.google.com/maps?q=%s+%s" % (
-    row["pt0.lat[0]"], row["pt0.lon[0]"])
+    case["pt0.lat"], case["pt0.lon"])
 
 webbrowser.open(url)
 

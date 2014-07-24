@@ -2,7 +2,7 @@ import os.path
 import numpy as np
 
 from openmdao.main.api import Assembly
-from openmdao.lib.drivers.api import CONMINdriver
+#from openmdao.lib.drivers.api import CONMINdriver
 
 import warnings
 try:
@@ -24,7 +24,7 @@ class CADRE_Optimization(Assembly):
         self.add("driver", pyopt_driver.pyOptDriver())
         self.driver.optimizer = "SNOPT"
         self.driver.options = {'Major optimality tolerance': 1e-3,
-                               'Iterations limit': 500000000,
+                               'Iterations limit': 5, # 500000000
                                "New basis file": 10}
         if os.path.exists("fort.10"):
             self.driver.options["Old basis file"] = 10
@@ -55,6 +55,7 @@ class CADRE_Optimization(Assembly):
         for i, name in enumerate(names):
             comp = self.add(name, CADRE(n, m, solar_raw1, solar_raw2,
                                         comm_raw, power_raw))
+            self.driver.workflow.add(name)
             comp.set("LD", LDs[i])
             comp.set("r_e2b_I0", r_e2b_I0s[i])
 
