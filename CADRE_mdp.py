@@ -24,7 +24,7 @@ class CADRE_Optimization(Assembly):
         self.add("driver", pyopt_driver.pyOptDriver())
         self.driver.optimizer = "SNOPT"
         self.driver.options = {'Major optimality tolerance': 1e-3,
-                               'Iterations limit': 5, # 500000000
+                               'Iterations limit': 500000000,
                                "New basis file": 10}
         if os.path.exists("fort.10"):
             self.driver.options["Old basis file"] = 10
