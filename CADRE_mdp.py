@@ -2,7 +2,7 @@ import os.path
 import numpy as np
 
 from openmdao.main.api import Assembly
-from openmdao.lib.drivers.api import CONMINdriver
+#from openmdao.lib.drivers.api import CONMINdriver
 
 import warnings
 try:
@@ -55,6 +55,7 @@ class CADRE_Optimization(Assembly):
         for i, name in enumerate(names):
             comp = self.add(name, CADRE(n, m, solar_raw1, solar_raw2,
                                         comm_raw, power_raw))
+            self.driver.workflow.add(name)
             comp.set("LD", LDs[i])
             comp.set("r_e2b_I0", r_e2b_I0s[i])
 
