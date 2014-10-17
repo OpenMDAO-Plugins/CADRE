@@ -39,13 +39,14 @@ class Testcase_CADRE_deriv(unittest.TestCase):
 
         top = set_as_top(Assembly())
         top.add('pt', CADRE(n, m))
+	top.driver.workflow.add('pt')
 
         i = 0
 
         top.pt.set("LD", LDs[i])
         top.pt.set("r_e2b_I0", r_e2b_I0s[i])
 
-        top.pt.run()
+        top.run()
 
         inputs = ['BsplineParameters.CP_gamma']
         outputs = ['Comm_DataDownloaded.Data']
