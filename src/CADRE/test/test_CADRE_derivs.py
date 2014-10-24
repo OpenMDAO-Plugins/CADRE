@@ -61,7 +61,6 @@ class Testcase_CADRE_deriv(unittest.TestCase):
             #J[:, j] = top.pt.driver.workflow.matvecFWD(arg)
             #arg[j] = 0.0
             
-        top.pt.driver.workflow.config_changed()
         J2 = top.pt.driver.workflow.calc_gradient(inputs, outputs, mode='adjoint')
 
         #Jt = np.zeros([nn, nn])
@@ -74,7 +73,6 @@ class Testcase_CADRE_deriv(unittest.TestCase):
         #print Jt.T
         #print J-Jt.T
         
-        top.pt.driver.workflow.config_changed()
         Jfd = top.pt.driver.workflow.calc_gradient(inputs, outputs, mode='fd')
 
         np.set_printoptions(threshold='nan')
