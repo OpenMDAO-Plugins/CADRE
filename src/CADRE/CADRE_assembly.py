@@ -248,9 +248,14 @@ class CADRE(Assembly):
         """
 
         inputs, outputs = {}, {}
+        
+        # Gather all inputs and output from the components. Ignore all
+        # framework vars.
         for compname in self.list_components():
+            comp = self.get(compname)
 
-            comp_inputs = self.get(compname).list_inputs()
+            comp_inputs = [inp for inp in comp.list_inputs() if \
+                           comp._trait_metadata[inp].get('framework_var') != True]
 
             for input_name in comp_inputs:
                 if input_name not in inputs:
@@ -258,7 +263,8 @@ class CADRE(Assembly):
                 else:
                     inputs[input_name].append(compname)
 
-            comp_outputs = self.get(compname).list_outputs()
+            comp_outputs = [inp for inp in comp.list_outputs() if \
+                           comp._trait_metadata[inp].get('framework_var') != True]
 
             for output_name in comp_outputs:
                 if output_name not in outputs:
@@ -266,58 +272,13 @@ class CADRE(Assembly):
                 else:
                     outputs[output_name].append(compname)
 
-        io = {}
-        #print "{0},{1},{2},{3}".format(
-             #"Variable",
-             #"Component",
-             #"Units",
-             #"Description"
-         #)
-
-        for compname in self.list_components():
-            comp_io = self.get(compname).list_inputs() + \
-                self.get(compname).list_outputs()
-
-            for io_name in comp_io:
-                if io_name not in ['derivative_exec_count',
-                                   'directory',
-                                   'exec_count',
-                                   'external_vars',
-                                   'fixed_external_vars',
-                                   'force_execute',
-                                   'init_state_var',
-                                   'itername',
-                                   'state_var',
-                                   ]:
-
-                    if io_name not in io:
-                        io[io_name] = [compname]
-                    else:
-                        io[io_name].append(compname)
-
-        for io_name in sorted( io.keys() ):
-            for compname in io[ io_name ] :
-                p = '.'.join( [compname, io_name] )
-                metadata = self.get_metadata( p )
-                #print p, metadata.get('units','None'), metadata.get('desc','None')
-                #print "{0},{1},{2},\"{3}\"".format(
-                     #io_name,
-                     #compname,
-                     #metadata.get('units','None'),
-                     #metadata.get('desc','None')
-                 #)
-
-                # if input_name not in [ 'directory', 'force_execute', 'state_var', 'init_state_var','external_vars','fixed_external_vars' ]:
-                #     p = '.'.join( [compname, input_name] )
-                #     metadata = self.get_metadata( p )
-                #     print p, metadata.get('units','None'), metadata.get('desc','None')
-
+        # Automatically connect assembly boundary inputs too.
         assym_level = self.list_inputs()
         assym_level.remove('directory')
-
         for var in assym_level:
             outputs[var] = ['']
 
+        # Do the connections
         for varname in outputs.keys():
             comps = outputs[varname]
             if len(comps) > 1:

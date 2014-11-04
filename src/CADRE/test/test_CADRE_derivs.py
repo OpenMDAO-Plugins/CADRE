@@ -82,9 +82,9 @@ class Testcase_CADRE_deriv(unittest.TestCase):
         #print J1
         #print J2
         #print Jfd
-        print np.max(J1-Jfd)
-        print np.max(J2-Jfd)
-        print np.max(J1-J2)
+        print np.max(abs(J1-Jfd))
+        print np.max(abs(J2-Jfd))
+        print np.max(abs(J1-J2))
 
         self.assertTrue( np.max(J1-J2) < 1.0e-6 )
         self.assertTrue( np.max(J1-Jfd) < 1.0e-4 )
