@@ -76,15 +76,15 @@ Package Metadata
     CADRE.comm.Comm_VectorBody=CADRE.comm:Comm_VectorBody
     CADRE.sun.Sun_PositionSpherical=CADRE.sun:Sun_PositionSpherical
     CADRE.attitude.Attitude_RotationMtx=CADRE.attitude:Attitude_RotationMtx
-    CADRE.attitude.Attitude_Roll=CADRE.attitude:Attitude_Roll
     CADRE.power.Power_SolarPower=CADRE.power:Power_SolarPower
-    CADRE.sun.Sun_PositionECI=CADRE.sun:Sun_PositionECI
-    CADRE.attitude.Attitude_Torque=CADRE.attitude:Attitude_Torque
     CADRE.battery.BatteryConstraints=CADRE.battery:BatteryConstraints
+    CADRE.attitude.Attitude_Torque=CADRE.attitude:Attitude_Torque
+    CADRE.sun.Sun_PositionECI=CADRE.sun:Sun_PositionECI
     CADRE.power.Power_CellVoltage=CADRE.power:Power_CellVoltage
     CADRE.attitude.Attitude_RotationMtxRates=CADRE.attitude:Attitude_RotationMtxRates
     CADRE.battery.BatteryPower=CADRE.battery:BatteryPower
     CADRE.rk4.RK4=CADRE.rk4:RK4
+    CADRE.attitude.Attitude_Roll=CADRE.attitude:Attitude_Roll
     CADRE.comm.Comm_AntRotationMtx=CADRE.comm:Comm_AntRotationMtx
     CADRE.power.Power_Total=CADRE.power:Power_Total
     CADRE.test.test_rk_deriv.RKTest=CADRE.test.test_rk_deriv:RKTest
@@ -129,5 +129,5 @@ Package Metadata
 
 - **summary:** OpenMDAO implementation of the CADRE CubeSat design problem
 
-- **version:** 0.7
+- **version:** 0.8
 
