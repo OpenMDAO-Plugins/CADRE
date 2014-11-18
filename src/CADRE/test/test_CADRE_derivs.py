@@ -51,7 +51,7 @@ class Testcase_CADRE_deriv(unittest.TestCase):
         inputs = ['BsplineParameters.CP_gamma']
         outputs = ['Comm_DataDownloaded.Data']
 
-        J1 = top.pt.driver.workflow.calc_gradient(inputs, outputs, mode='forward')
+        J1 = top.pt.driver.calc_gradient(inputs, outputs, mode='forward')
 
         #nn = len(top.pt.driver.workflow.res)
         #J = np.zeros([nn, nn])
@@ -60,20 +60,20 @@ class Testcase_CADRE_deriv(unittest.TestCase):
             #arg[j] = 1.0
             #J[:, j] = top.pt.driver.workflow.matvecFWD(arg)
             #arg[j] = 0.0
-            
-        J2 = top.pt.driver.workflow.calc_gradient(inputs, outputs, mode='adjoint')
+
+        J2 = top.pt.driver.calc_gradient(inputs, outputs, mode='adjoint')
 
         #Jt = np.zeros([nn, nn])
         #for j in range(nn):
             #arg[j] = 1.0
             #Jt[:, j] = top.pt.driver.workflow.matvecREV(arg)
             #arg[j] = 0.0
-        
+
         #print J
         #print Jt.T
         #print J-Jt.T
-        
-        Jfd = top.pt.driver.workflow.calc_gradient(inputs, outputs, mode='fd')
+
+        Jfd = top.pt.driver.calc_gradient(inputs, outputs, mode='fd')
 
         np.set_printoptions(threshold='nan')
         #print np.nonzero(J1)

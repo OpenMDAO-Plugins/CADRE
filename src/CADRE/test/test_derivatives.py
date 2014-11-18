@@ -77,19 +77,17 @@ class Testcase_CADRE(unittest.TestCase):
 
     def compare_derivatives(self, var_in, var_out, rel_error=False):
 
-        wflow = self.model.driver.workflow
+        wflow = self.model.driver
         inputs = ['comp.%s' % v for v in var_in]
         outputs = ['comp.%s' % v for v in var_out]
 
         # Numeric
-        wflow.config_changed()
         Jn = wflow.calc_gradient(inputs=inputs,
                                  outputs=outputs,
                                  mode="fd")
         # print Jn
 
         # Analytic forward
-        wflow.config_changed()
         Jf = wflow.calc_gradient(inputs=inputs,
                                  outputs=outputs,
                                  mode='forward')
@@ -104,7 +102,6 @@ class Testcase_CADRE(unittest.TestCase):
         assert_rel_error(self, diff.max(), 0.0, 1e-3)
 
         # Analytic adjoint
-        wflow.config_changed()
         Ja = wflow.calc_gradient(inputs=inputs,
                                  outputs=outputs,
                                  mode='adjoint')
