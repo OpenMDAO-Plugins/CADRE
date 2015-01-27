@@ -219,6 +219,7 @@ class CADRE(Assembly):
         # self.driver.workflow.add("debug")
 
         self.make_connections()
+        self.driver.system_type = "serial"
 
     def get_unconnected_inputs(self):
         unconnected_inputs = []

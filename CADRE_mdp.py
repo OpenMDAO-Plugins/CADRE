@@ -1,8 +1,11 @@
 import os.path
 import numpy as np
 
+
+
 from openmdao.main.api import Assembly
 #from openmdao.lib.drivers.api import CONMINdriver
+
 
 import warnings
 try:
@@ -11,6 +14,9 @@ except ImportError:
     warnings.warn(
         "pyopt_driver must be installed to run the full CADRE optimization",
         ImportWarning)
+
+from openmdao.main.test.simpledriver import SimpleDriver
+
 
 from CADRE.CADRE_assembly import CADRE
 
@@ -21,15 +27,17 @@ class CADRE_Optimization(Assembly):
         super(CADRE_Optimization, self).__init__()
 
         # add SNOPT driver
-        self.add("driver", pyopt_driver.pyOptDriver())
-        self.driver.optimizer = "SNOPT"
-        self.driver.options = {'Major optimality tolerance': 1e-3,
-                               'Iterations limit': 500000000,
-                               "New basis file": 10}
-        if os.path.exists("fort.10"):
-            self.driver.options["Old basis file"] = 10
+        # self.add("driver", pyopt_driver.pyOptDriver())
+        # self.driver.optimizer = "SNOPT"
+        # self.driver.options = {'Major optimality tolerance': 1e-3,
+        #                        'Iterations limit': 500000000,
+        #                        "New basis file": 10}
+        # if os.path.exists("fort.10"):
+        #     self.driver.options["Old basis file"] = 10
 
         #driver = self.add("driver", CONMINdriver())
+        self.add("driver", SimpleDriver())
+
 
         # Raw data to load
         fpath = os.path.dirname(os.path.realpath(__file__))
