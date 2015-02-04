@@ -35,8 +35,10 @@ class CADRE_Optimization(Assembly):
         # if os.path.exists("fort.10"):
         #     self.driver.options["Old basis file"] = 10
 
+
         #driver = self.add("driver", CONMINdriver())
         self.add("driver", SimpleDriver())
+        self.driver.gradient_options.lin_solver = "linear_gs"
 
 
         # Raw data to load

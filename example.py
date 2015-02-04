@@ -1,7 +1,13 @@
+import time
+
+
+
 from openmdao.lib.casehandlers.api import JSONCaseRecorder, BSONCaseRecorder
 from CADRE_mdp import CADRE_Optimization
 
-print "setting up"
+s_time = time.time()
+
+print "setting up", 
 top = CADRE_Optimization(n=1500, m=300)
 # Could also use JSONCaseRecorder but that would be 3 to 4 times the size
 #top.recorders = [BSONCaseRecorder('CADRE.bson')]
@@ -21,14 +27,14 @@ top._setup()
 # #plot_graphs(model)
 # exit()
 
+print "  ", time.time()-s_time, "sec"
 print "running"
 
 
-
-import time
 start = time.time()
 top.run()
+print top.driver.calc_gradient()
 
-print "runtime", time.time()-start
+print "runtime", time.time()-start, "sec"
 
 
