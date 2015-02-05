@@ -38,7 +38,7 @@ class CADRE_Optimization(Assembly):
 
         #driver = self.add("driver", CONMINdriver())
         self.add("driver", SimpleDriver())
-        self.driver.gradient_options.lin_solver = "linear_gs"
+        self.driver.gradient_options.lin_solver = "petsc_ksp"
 
 
         # Raw data to load

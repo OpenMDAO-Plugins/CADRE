@@ -220,7 +220,7 @@ class CADRE(Assembly):
 
         self.make_connections()
         self.driver.system_type = "serial"
-        self.driver.lin_solver = "linear_gs"
+        self.driver.gradient_options.lin_solver = "petsc_ksp"
 
     def get_unconnected_inputs(self):
         unconnected_inputs = []
