@@ -39,7 +39,7 @@ class Testcase_CADRE_deriv(unittest.TestCase):
 
         top = set_as_top(Assembly())
         top.add('pt', CADRE(n, m))
-	top.driver.workflow.add('pt')
+        top.driver.workflow.add('pt')
 
         i = 0
 
