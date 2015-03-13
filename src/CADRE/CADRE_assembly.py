@@ -248,14 +248,14 @@ class CADRE(Assembly):
         """
 
         inputs, outputs = {}, {}
-        
+
         # Gather all inputs and output from the components. Ignore all
         # framework vars.
         for compname in self.list_components():
             comp = self.get(compname)
 
             comp_inputs = [inp for inp in comp.list_inputs() if \
-                           comp._trait_metadata[inp].get('framework_var') != True]
+                           comp.get_metadata(inp).get('framework_var') != True]
 
             for input_name in comp_inputs:
                 if input_name not in inputs:
@@ -264,7 +264,7 @@ class CADRE(Assembly):
                     inputs[input_name].append(compname)
 
             comp_outputs = [inp for inp in comp.list_outputs() if \
-                           comp._trait_metadata[inp].get('framework_var') != True]
+                           comp.get_metadata(inp).get('framework_var') != True]
 
             for output_name in comp_outputs:
                 if output_name not in outputs:
