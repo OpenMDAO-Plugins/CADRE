@@ -17,7 +17,7 @@ except ImportError:
 
 from openmdao.main.test.simpledriver import SimpleDriver
 
-
+from pyoptsparse_driver.pyoptsparse_driver import pyOptSparseDriver
 from CADRE.CADRE_assembly import CADRE
 
 
@@ -27,17 +27,18 @@ class CADRE_Optimization(Assembly):
         super(CADRE_Optimization, self).__init__()
 
         # add SNOPT driver
-        # self.add("driver", pyopt_driver.pyOptDriver())
-        # self.driver.optimizer = "SNOPT"
-        # self.driver.options = {'Major optimality tolerance': 1e-3,
-        #                        'Iterations limit': 500000000,
-        #                        "New basis file": 10}
+        #self.add("driver", pyopt_driver.pyOptDriver())
+        self.add("driver", pyOptSparseDriver())
+        self.driver.optimizer = "SNOPT"
+        self.driver.options = {'Major optimality tolerance': 1e-3,
+                               'Iterations limit': 500000000,
+                               "New basis file": 10}
         # if os.path.exists("fort.10"):
         #     self.driver.options["Old basis file"] = 10
 
 
         #driver = self.add("driver", CONMINdriver())
-        self.add("driver", SimpleDriver())
+        #self.add("driver", SimpleDriver())
         self.driver.gradient_options.lin_solver = "petsc_ksp"
 
 
@@ -74,7 +75,8 @@ class CADRE_Optimization(Assembly):
             self.driver.add_parameter("%s.CP_gamma" %
                                       name, low=0, high=np.pi / 2.)
             self.driver.add_parameter("%s.CP_P_comm" % name, low=0., high=25.)
-            self.driver.add_parameter("%s.iSOC[0]" % name, low=0.2, high=1.)
+            #self.driver.add_parameter("%s.iSOC[0]" % name, low=0.2, high=1.)
+            self.driver.add_parameter("%s.iSOC" % name, low=0.2, high=1.)
 
             # add constraints
             self.driver.add_constraint("%s.ConCh <= 0" % name)
